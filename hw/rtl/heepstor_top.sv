@@ -51,6 +51,9 @@ module heepstor_top #(
   import reg_pkg::*;
   import heepstor_pkg::*;
 
+  // eXtension Interface
+  if_xif #() ext_if ();
+
   x_heep_system #(
       .X_EXT(X_EXT),
       .COREV_PULP(COREV_PULP),
@@ -135,15 +138,15 @@ module heepstor_top #(
       .spi_sck_io(spi_sck_o),
       .i2c_scl_io,
       .i2c_sda_io,
-      .spi2_sd_0_io(spi2_sd_io[0]),
-      .spi2_sd_1_io(spi2_sd_io[1]),
-      .spi2_sd_2_io(spi2_sd_io[2]),
-      .spi2_sd_3_io(spi2_sd_io[3]),
-      .spi2_cs_0_io(spi2_csb_o[0]),
-      .spi2_cs_1_io(spi2_csb_o[1]),
+      .spi2_sd_0_io(spi2_sd_0_io),
+      .spi2_sd_1_io(spi2_sd_1_io),
+      .spi2_sd_2_io(spi2_sd_2_io),
+      .spi2_sd_3_io(spi2_sd_3_io),
+      .spi2_cs_0_io(spi2_csb_io[0]),
+      .spi2_cs_1_io(spi2_csb_io[1]),
       .spi2_sck_io(spi2_sck_o),
-      .pdm2pcm_clk_io,
-      .pdm2pcm_pdm_io,
+      .pdm2pcm_pdm_io(gpio_io[18]),
+      .pdm2pcm_clk_io(gpio_io[19]),
       .i2s_sck_io(i2s_sck_io),
       .i2s_ws_io(i2s_ws_io),
       .i2s_sd_io(i2s_sd_io),

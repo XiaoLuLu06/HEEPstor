@@ -11,6 +11,9 @@
 FPGA_BOARD 	?= zcu104
 PORT		?= /dev/ttyUSB2
 
+# TODO: Check if we are setting the CPU correctly
+CPU ?= cv32e40p
+
 # TODO: See what EXTERNAL_DOMAINS is, and how to adapt it to our usecase.
 # 1 external domain for the CGRA
 EXTERNAL_DOMAINS = 1
@@ -40,7 +43,7 @@ heepstor-gen:
 # Generates mcu files. First the mcu-gen from X-HEEP is called.
 # This is needed to be done after the X-HEEP mcu-gen because the test-bench to be used is the one from heepsilon, not the one from X-HEEP.
 mcu-gen: heepstor-gen
-	$(MAKE) -f $(XHEEP_MAKE) EXTERNAL_DOMAINS=${EXTERNAL_DOMAINS} MEMORY_BANKS=${MEMORY_BANKS} $(MAKECMDGOALS)
+	$(MAKE) -f $(XHEEP_MAKE) EXTERNAL_DOMAINS=${EXTERNAL_DOMAINS} CPU=${CPU} MEMORY_BANKS=${MEMORY_BANKS} $(MAKECMDGOALS)
 
 ## Builds (synthesis and implementation) the bitstream for the FPGA version using Vivado
 ## @param FPGA_BOARD=zcu104
@@ -48,7 +51,7 @@ mcu-gen: heepstor-gen
 # TODO: See if we can use .venv or have to use conda
 # vivado-fpga: |venv
 vivado-fpga:
-	fusesoc --cores-root . run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildvivado.log
+	fusesoc --cores-root . run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepstor 2>&1 | tee buildvivado.log
 
 
 # Runs verible formating

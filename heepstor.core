@@ -14,7 +14,7 @@ filesets:
     - openhwgroup.org:systems:core-v-mini-mcu
     files:
     - hw/rtl/heepstor_pkg.sv
-    - hw/rtl/heepstor.sv
+    - hw/rtl/heepstor_top.sv
     file_type: systemVerilogSource
 
   x_heep_system:
@@ -102,16 +102,16 @@ filesets:
     depend:
     - openhwgroup.org:systems:core-v-mini-mcu-fpga
     files:
-    - hw/fpga_cgra/scripts/generate_sram_general.tcl: { file_type: tclSource }
-    - hw/fpga_cgra/scripts/generate_sram_emem.tcl: { file_type: tclSource }
     - hw/vendor/esl_epfl_x_heep/hw/fpga/xilinx_core_v_mini_mcu_wrapper.sv:  { file_type: systemVerilogSource }
-    - hw/fpga_cgra/cgra_sram_wrapper.sv:  { file_type: systemVerilogSource }
-    - hw/fpga_cgra/cgra_clock_gate.sv:  { file_type: systemVerilogSource }
-    - hw/fpga_cgra/xilinx_heepstor_wrapper.sv:  { file_type: systemVerilogSource }
+    - hw/fpga_heepstor/xilinx_heepstor_wrapper.sv:  { file_type: systemVerilogSource }
+    # - hw/fpga_cgra/cgra_sram_wrapper.sv:  { file_type: systemVerilogSource }
+    # - hw/fpga_cgra/cgra_clock_gate.sv:  { file_type: systemVerilogSource }
+    # - hw/fpga_cgra/scripts/generate_sram_general.tcl: { file_type: tclSource }
+    # - hw/fpga_cgra/scripts/generate_sram_emem.tcl: { file_type: tclSource }
 
   xdc-fpga-zcu104:
     files:
-    - hw/fpga_cgra/constraints/zcu104/pin_assign.xdc
+    - hw/fpga_heepstor/constraints/zcu104/pin_assign.xdc
     file_type: xdc
 
   fpga-arm-emulation:
@@ -318,5 +318,5 @@ targets:
       vivado:
         part: xczu7ev-ffvc1156-2-e
         board_part: xilinx.com:zcu104:part0:1.0
-        board_repo_paths: [../../../hw/fpga/board_files/vendor/esl_epfl_zcu104_board_files]
+        board_repo_paths: [../../../hw/vendor/esl_epfl_x_heep/hw/fpga/board_files/vendor/esl_epfl_zcu104_board_files]
     toplevel: [xilinx_heepstor_wrapper]

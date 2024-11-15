@@ -18,7 +18,7 @@ package heepstor_pkg;
   localparam EXT_XBAR_NSLAVE = 1;
 
   localparam int unsigned LOG_EXT_XBAR_NMASTER = EXT_XBAR_NMASTER > 1 ? $clog2(
-      CGRA_XBAR_NMASTER
+      EXT_XBAR_NMASTER
   ) : 32'd1;
   localparam int unsigned LOG_EXT_XBAR_NSLAVE = EXT_XBAR_NSLAVE > 1 ? $clog2(
       EXT_XBAR_NSLAVE
@@ -40,11 +40,11 @@ package heepstor_pkg;
   localparam logic [31:0] SYSTOLIC_ARRAY_PERIPH_START_ADDRESS = core_v_mini_mcu_pkg::EXT_PERIPHERAL_START_ADDRESS + 32'h0000000;
   localparam logic [31:0] SYSTOLIC_ARRAY_PERIPH_MEM_SIZE = 32'h0001000;
   localparam logic [31:0] SYSTOLIC_ARRAY_PERIPH_END_ADDRESS = SYSTOLIC_ARRAY_PERIPH_START_ADDRESS + SYSTOLIC_ARRAY_PERIPH_MEM_SIZE;
-  localparam logic [31:0] SYSTOLIC_ARRAY_IDX = 32'd0;
+  localparam logic [31:0] SYSTOLIC_ARRAY_PERIPH_IDX = 32'd0;
 
   localparam addr_map_rule_t [EXT_SYSTEM_NPERIPHERALS-1:0] EXT_PERIPHERALS_ADDR_RULES = '{
       '{
-          idx: SYSTOLIC_ARRAY_IDX,
+          idx: SYSTOLIC_ARRAY_PERIPH_IDX,
           start_addr: SYSTOLIC_ARRAY_PERIPH_START_ADDRESS,
           end_addr: SYSTOLIC_ARRAY_PERIPH_END_ADDRESS
       }
