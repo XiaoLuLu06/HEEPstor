@@ -24,16 +24,16 @@ PROJECT ?= hello_world
 export HEEP_DIR = hw/vendor/esl_epfl_x_heep/
 
 # TODO: See if we can use .venv or have to use conda
-include $(HEEP_DIR)Makefile.venv
+# include $(HEEP_DIR)Makefile.venv
 
-HEEPSTOR_CFG  ?= heepstor_cfg.hjson
+HEEPSTOR_CFG ?= heepstor_cfg.hjson
 
 # TODO: Make a guide on how to get started in README.md
 
 # TODO: Check automatically generated 
 heepstor-gen:
-	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSILON_CFG) --outdir hw/rtl --pkg-sv hw/rtl/heepstor_pkg.sv.tpl
-	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSILON_CFG) --outdir sw/external/drivers/systolic_array --header-c sw/external/drivers/systolic_array/systolic_array.h.tpl
+	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSTOR_CFG) --outdir hw/rtl --pkg-sv hw/rtl/heepstor_pkg.sv.tpl
+	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSTOR_CFG) --outdir sw/external/drivers/systolic_array --header-c sw/external/drivers/systolic_array/systolic_array.h.tpl
 
 # TODO: See what EXTERNAL_DOMAINS is, and how to adapt it to our usecase.
 
@@ -46,7 +46,8 @@ mcu-gen: heepstor-gen
 ## @param FPGA_BOARD=zcu104
 ## @param FUSESOC_FLAGS=--flag=<flagname>
 # TODO: See if we can use .venv or have to use conda
-vivado-fpga: |venv
+# vivado-fpga: |venv
+vivado-fpga:
 	fusesoc --cores-root . run --no-export --target=$(FPGA_BOARD) $(FUSESOC_FLAGS) --setup --build eslepfl:systems:heepsilon 2>&1 | tee buildvivado.log
 
 

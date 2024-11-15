@@ -7,7 +7,7 @@ package heepstor_pkg;
   import addr_map_rule_pkg::*;
   import core_v_mini_mcu_pkg::*;
 
-  localparam SYSTOLIC_ARRAY_SIZE = ${heepstor_pkg.sv.tpl};
+  localparam SYSTOLIC_ARRAY_SIZE = ${systolic_array_size};
 
   // TODO: Simplify this. We probably only need one EXT_XBAR_NSLAVE, no EXT_XBAR_NMASTER and no EXT_PERIPHERALS. 
 

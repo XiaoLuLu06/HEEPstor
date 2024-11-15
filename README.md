@@ -8,7 +8,12 @@ In the future, our goal is to integrate HEEPstor with a Machine Learning Framewo
 
 Due to its modular design, HEEPstor respects the X-HEEP workflow. As such, you can follow [X-HEEP's getting started](https://x-heep.readthedocs.io/en/latest/How_to/GettingStarted.html) to set up the environment.
 
-👉 For the most accurate set-up instructions please refer to the documentation of the [vendorized X-HEEP](https://github.com/esl-epfl/heepsilon/tree/main/hw/vendor/esl_epfl_x_heep).
-
-
-
+### TODO: Write basic set-up instructions
+- Mention conda
+- Mention supported FPGAs
+- Set systolic array size in `heepstor.core`
+- Application development
+- `heepstor-gen`
+- `mcu-gen`
+- `vivado-fpga`
+- `run_fpga`
