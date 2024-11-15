@@ -1,0 +1,14 @@
+// Copyright 2020 ETH Zurich and University of Bologna.
+// Solderpad Hardware License, Version 0.51, see LICENSE for details.
+// SPDX-License-Identifier: SHL-0.51
+// Derived from Occamy: https://github.com/pulp-platform/snitch/blob/master/hw/system/occamy/src/occamy_cfg.hjson
+// Peripherals configuration for core-v-mini-mcu.
+{
+    systolic_array: {
+        // Number of rows and columns of the instantiated systolic array. 
+        // For example, an array of size 8 will have 8*8=64 Processing Elements.
+        // It must be a multiple of 4.
+        // TODO: Guarantee that it's a multiple of 4 in the generation script. 
+        size: 8
+    },
+}

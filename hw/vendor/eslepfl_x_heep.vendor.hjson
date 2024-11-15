@@ -1,0 +1,23 @@
+// Copyright EPFL
+// Licensed under the Solderpad Hardware License v2.1, see LICENSE.txt for details
+// SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
+
+// TODO: In the future, instead of having the vendorized X-HEEP folder "esl_epfl_x_heep" in the repo,
+//  add an additional Makefile step to download the vendorized X-HEEP.
+
+{
+  name: "esl_epfl_x_heep",
+  target_dir: "esl_epfl_x_heep",
+
+  upstream: {
+    url: "https://github.com/esl-epfl/x-heep.git",
+    rev: "0f28c2cbf7bc99f836cf4f5884e89b7bdf350529",
+  },
+
+  patch_dir: "patches/esl_epfl_x_heep",
+
+  exclude_from_upstream: [
+    ".github",
+    "ci",
+  ]
+}

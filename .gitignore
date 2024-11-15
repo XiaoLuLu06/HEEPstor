@@ -1,0 +1,25 @@
+# ignore files by default
+
+build
+*.log
+*.do
+.venv/
+*__pycache__*
+# sw files
+*.map
+*.hex
+*.elf
+*.dis
+*.dump
+
+# TODO: ignore all automatically generated files
+
+# TODO: Enable simulation
+# tb/tb_util.svh
+
+hw/rtl/heepstor_pkg.sv
+sw/external/drivers/systolic_array/systolic_array.h
+
+*.vscode*
+*vivado*
+*__pycache__*
