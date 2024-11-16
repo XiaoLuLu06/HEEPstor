@@ -36,7 +36,7 @@ HEEPSTOR_CFG ?= heepstor_cfg.hjson
 # TODO: Check automatically generated 
 heepstor-gen:
 	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSTOR_CFG) --outdir hw/rtl --pkg-sv hw/rtl/heepstor_pkg.sv.tpl
-	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSTOR_CFG) --outdir sw/external/drivers/systolic_array --header-c sw/external/drivers/systolic_array/systolic_array.h.tpl
+	$(PYTHON) util/heepstor_gen.py --cfg $(HEEPSTOR_CFG) --outdir sw/external/drivers/systolic_array --header-c sw/external/drivers/systolic_array/systolic_array_def.h.tpl
 
 # TODO: See what EXTERNAL_DOMAINS is, and how to adapt it to our usecase.
 
@@ -110,11 +110,22 @@ run-fpga-com:
 	$(MAKE) flash-prog ;\
 	picocom -b 9600 -r -l --imap lfcrlf /dev/serial/by-id/usb-FTDI_Quad_RS232-HS-if02-port0
 
-XHEEP_MAKE = $(HEEP_DIR)/external.mk
-include $(XHEEP_MAKE)
-
+.PHONY: app
 # Add a dependency on the existing app target of XHEEP to create a link to the build folder
 app: link_build
+	$(MAKE) xheep_app PROJECT=$(PROJECT) LINKER=flash_load TARGET=$(FPGA_BOARD) ARCH=rv32imfc
+
+XHEEP_MAKE = $(HEEP_DIR)/external.mk
+
+.PHONY: xheep_app
+xheep_app:
+	$(MAKE) -f $(XHEEP_MAKE) app
+
+include $(XHEEP_MAKE)
+
+# TODO: This is not loading the correct ARCH!!
+app: link_build
+# TODO: Remove the below infinite loop! Find a way to change the parameters without modifying X-Heep makefile. 
 
 clean-app: link_rm
 

@@ -51,8 +51,10 @@ int main(int argc, char *argv[])
     while(1)
     {
         volatile float res = float_add(1.2,  3.14);
+ 
+        // TODO: Make sure HEEPstor is loading the correct arch
         ftoa(res, fbuf, sizeof(fbuf));
-        printf("hello world otro! float: %s\n", fbuf);
+        printf("hello world from Heepstor! float: %s\n", fbuf);
 
         // printf("hola mundo, pedro \n");    
     }

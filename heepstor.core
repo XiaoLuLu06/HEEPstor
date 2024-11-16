@@ -109,10 +109,12 @@ filesets:
     # - hw/fpga_cgra/scripts/generate_sram_general.tcl: { file_type: tclSource }
     # - hw/fpga_cgra/scripts/generate_sram_emem.tcl: { file_type: tclSource }
 
-  xdc-fpga-zcu104:
-    files:
-    - hw/fpga_heepstor/constraints/zcu104/pin_assign.xdc
-    file_type: xdc
+  # Use X-HEEP constraint files instead of our own.
+
+  # xdc-fpga-zcu104:
+  #   files:
+  #   - hw/fpga_heepstor/constraints/zcu104/pin_assign.xdc
+  #   file_type: xdc
 
   fpga-arm-emulation:
     depend:
@@ -304,7 +306,7 @@ targets:
     filesets_append:
     - x_heep_system
     - rtl-fpga
-    - xdc-fpga-zcu104
+    # - xdc-fpga-zcu104
     - ext_bus
     parameters:
     - COREV_PULP

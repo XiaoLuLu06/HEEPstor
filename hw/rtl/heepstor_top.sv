@@ -3,13 +3,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH SHL-2.1
 
 module heepstor_top #(
-    parameter COREV_PULP = 0,
-    parameter FPU        = 1,
-    parameter ZFINX      = 0,
-    parameter X_EXT      = 0
+    parameter COREV_PULP           = 0,
+    parameter FPU                  = 1,
+    parameter ZFINX                = 0,
+    parameter X_EXT                = 0  // eXtension interface in cv32e40x
 ) (
+
     inout logic clk_i,
-    inout logic rst_ni,
+    inout logic rst_n,
 
     inout logic boot_select_i,
     inout logic execute_from_flash_i,
@@ -20,31 +21,35 @@ module heepstor_top #(
     inout logic jtag_tdi_i,
     inout logic jtag_tdo_o,
 
-    inout uart_rx_i,
-    inout uart_tx_o,
+    inout logic uart_rx_i,
+    inout logic uart_tx_o,
 
-    inout logic [22:0] gpio_io,
+    inout logic [17:0] gpio_io,
 
     output logic [31:0] exit_value_o,
-    inout  logic        exit_valid_o,
+    inout  logic exit_valid_o,
 
     inout logic [3:0] spi_flash_sd_io,
-    inout logic       spi_flash_csb_o,
-    inout logic       spi_flash_sck_o,
+    inout logic spi_flash_csb_o,
+    inout logic spi_flash_sck_o,
 
     inout logic [3:0] spi_sd_io,
-    inout logic       spi_csb_o,
-    inout logic       spi_sck_o,
+    inout logic spi_csb_o,
+    inout logic spi_sck_o,
 
-    inout logic       spi2_sd_0_io,
-    inout logic       spi2_sd_1_io,
-    inout logic       spi2_sd_2_io,
-    inout logic       spi2_sd_3_io,
-    inout logic [1:0] spi2_csb_io,
-    inout logic       spi2_sck_o,
+    inout logic [3:0] spi2_sd_io,
+    inout logic [1:0] spi2_csb_o,
+    inout logic spi2_sck_o,
 
     inout logic i2c_scl_io,
-    inout logic i2c_sda_io
+    inout logic i2c_sda_io,
+
+    inout logic pdm2pcm_clk_io,
+    inout logic pdm2pcm_pdm_io,
+
+    inout logic i2s_sck_io,
+    inout logic i2s_ws_io,
+    inout logic i2s_sd_io
 );
 
   import obi_pkg::*;
@@ -91,8 +96,8 @@ module heepstor_top #(
       .external_subsystem_rst_no(),
       .external_ram_banks_set_retentive_no(),
       .external_subsystem_clkgate_en_no(),
-      .exit_value_o(exit_value),
-      .clk_i(clk_gen),
+      .exit_value_o(exit_value_o),
+      .clk_i(clk_i),
       .rst_ni(rst_n),
       .boot_select_i(boot_select_i),
       .execute_from_flash_i(execute_from_flash_i),
@@ -138,15 +143,15 @@ module heepstor_top #(
       .spi_sck_io(spi_sck_o),
       .i2c_scl_io,
       .i2c_sda_io,
-      .spi2_sd_0_io(spi2_sd_0_io),
-      .spi2_sd_1_io(spi2_sd_1_io),
-      .spi2_sd_2_io(spi2_sd_2_io),
-      .spi2_sd_3_io(spi2_sd_3_io),
-      .spi2_cs_0_io(spi2_csb_io[0]),
-      .spi2_cs_1_io(spi2_csb_io[1]),
+      .spi2_sd_0_io(spi2_sd_io[0]),
+      .spi2_sd_1_io(spi2_sd_io[1]),
+      .spi2_sd_2_io(spi2_sd_io[2]),
+      .spi2_sd_3_io(spi2_sd_io[3]),
+      .spi2_cs_0_io(spi2_csb_o[0]),
+      .spi2_cs_1_io(spi2_csb_o[1]),
       .spi2_sck_io(spi2_sck_o),
-      .pdm2pcm_pdm_io(gpio_io[18]),
-      .pdm2pcm_clk_io(gpio_io[19]),
+      .pdm2pcm_clk_io,
+      .pdm2pcm_pdm_io,
       .i2s_sck_io(i2s_sck_io),
       .i2s_ws_io(i2s_ws_io),
       .i2s_sd_io(i2s_sd_io),
@@ -154,6 +159,7 @@ module heepstor_top #(
       .ext_dma_slot_rx_i('0)
   );
 
+endmodule  // heepstor_pkg
 
   // TODO: Actually instantiate the systolic array accelerator in the bus
 
@@ -367,5 +373,3 @@ module heepstor_top #(
 //       .external_subsystem_rst_no(external_subsystem_rst_n),
 //       .external_ram_banks_set_retentive_no(external_ram_banks_set_retentive_n)
 //   );
-
-endmodule  // heepstor_pkg
