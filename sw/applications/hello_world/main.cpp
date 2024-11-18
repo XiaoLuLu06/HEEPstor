@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include "csr.h"
 
+#include "systolic_array.h"
+#include "heepstor.h"
+
 float __attribute__ ((noinline)) float_add(float a, float b){
     return a + b;
 }
@@ -41,23 +44,30 @@ void ftoa(float f, char *buf, size_t bufsiz) {
 
 int main(int argc, char *argv[])
 {
-    char fbuf[16];
-
-    printf("Enabling FPU...\n");
-    enable_floating_point_unit();
-    printf("FPU enabled!\n");
-
-    /* write something to stdout */
-    while(1)
+    // 1. Enable the Floating-Point Unit
     {
-        volatile float res = float_add(1.2,  3.14);
- 
-        // TODO: Make sure HEEPstor is loading the correct arch
-        ftoa(res, fbuf, sizeof(fbuf));
-        printf("hello world from Heepstor! float: %s\n", fbuf);
-
-        // printf("hola mundo, pedro \n");    
+      printf("Enabling FPU...\n");
+      enable_floating_point_unit();
+      printf("FPU enabled!\n");
     }
+
+    // 2. Test adding two floats
+    {
+      volatile float res = float_add(1.2,  3.14);
+      char fbuf[16];
+      ftoa(res, fbuf, sizeof(fbuf));
+      printf("hello world from Heepstor! float: %s\n", fbuf);
+    }
+
+    // 3. Use the systolic array peripheral
+    {
+      SystolicArray systolic_array {mmio_region_from_addr(SYSTOLIC_ARRAY_START_ADDRESS)};
+      systolic_array.write(0x12340, 23);
+
+      uint32_t res = systolic_array.read(0x42);
+      printf("Read result: 0x%x\n", res);
+    }
+    
     return EXIT_SUCCESS;
 }
 

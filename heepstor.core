@@ -15,6 +15,7 @@ filesets:
     files:
     - hw/rtl/heepstor_pkg.sv
     - hw/rtl/heepstor_top.sv
+    - hw/rtl/systolic_array_wrapper.sv
     file_type: systemVerilogSource
 
   x_heep_system:

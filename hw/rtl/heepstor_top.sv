@@ -59,6 +59,18 @@ module heepstor_top #(
   // eXtension Interface
   if_xif #() ext_if ();
 
+  // Systolic array
+  obi_req_t ext_core_data_req_o;
+  obi_resp_t ext_core_data_resp_i;
+
+  systolic_array_wrapper systolic_wrapper_i (
+    .clk_i(clk_i),
+    .rst_n(rst_n),
+
+    .obi_bus_req_i(ext_core_data_req_o),
+    .obi_bus_resp_o(ext_core_data_resp_i)
+  );
+
   x_heep_system #(
       .X_EXT(X_EXT),
       .COREV_PULP(COREV_PULP),
@@ -76,10 +88,17 @@ module heepstor_top #(
       .ext_xbar_master_resp_o(),
       .ext_core_instr_req_o(),
       .ext_core_instr_resp_i('0),
-      .ext_core_data_req_o(),
-      .ext_core_data_resp_i('0),
+
+      // The accelerator is plugged into the X-Heep data bus.
+      // ext_core_data_req_o and ext_core_data_resp_i are the external slave ports that
+      //  the CPU will access for data operations.
+      .ext_core_data_req_o(ext_core_data_req_o),
+      .ext_core_data_resp_i(ext_core_data_resp_i),
+
       .ext_debug_master_req_o(),
       .ext_debug_master_resp_i('0),
+
+      // TODO: In the future, if we want DMA support, also connect the accelerator to this bus
       .ext_dma_read_req_o(),
       .ext_dma_read_resp_i('0),
       .ext_dma_write_req_o(),
