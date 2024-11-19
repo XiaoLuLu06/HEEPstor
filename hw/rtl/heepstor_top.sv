@@ -98,7 +98,8 @@ module heepstor_top #(
       .ext_debug_master_req_o(),
       .ext_debug_master_resp_i('0),
 
-      // TODO: In the future, if we want DMA support, also connect the accelerator to this bus
+      // TODO: In the future, if we want DMA support, also connect the accelerator to this bus.
+      // Instantiate ext_bus to connect the single slave to the bus. See how HEEPsilon does it as a reference.
       .ext_dma_read_req_o(),
       .ext_dma_read_resp_i('0),
       .ext_dma_write_req_o(),

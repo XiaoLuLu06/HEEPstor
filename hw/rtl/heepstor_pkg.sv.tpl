@@ -8,6 +8,7 @@ package heepstor_pkg;
   import core_v_mini_mcu_pkg::*;
 
   localparam SYSTOLIC_ARRAY_SIZE = ${systolic_array_size};
+  localparam LOG_SYSTOLIC_ARRAY_SIZE = $clog2(SYSTOLIC_ARRAY_SIZE);
 
   // TODO: Simplify this. We probably only need one EXT_XBAR_NSLAVE, no EXT_XBAR_NMASTER and no EXT_PERIPHERALS. 
 

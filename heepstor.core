@@ -14,8 +14,37 @@ filesets:
     - openhwgroup.org:systems:core-v-mini-mcu
     files:
     - hw/rtl/heepstor_pkg.sv
+    - hw/rtl/systolic_array/TicSAT_pkg.sv
     - hw/rtl/heepstor_top.sv
     - hw/rtl/systolic_array_wrapper.sv
+    # Systolic array sources
+    - hw/rtl/systolic_array/FIFO_in.sv
+    - hw/rtl/systolic_array/FIFO_out_Pipelined.sv
+    - hw/rtl/systolic_array/FIFO_out.sv
+    - hw/rtl/systolic_array/Find_First_Set_Bit.sv
+    - hw/rtl/systolic_array/Fp32_Adder_Latency3.sv
+    - hw/rtl/systolic_array/Fp32_Adder.sv
+    - hw/rtl/systolic_array/FP32_int8_mult.sv
+    - hw/rtl/systolic_array/Fp32_Multiplier_Latency2.sv
+    - hw/rtl/systolic_array/Fp32_Multiplier.sv
+    - hw/rtl/systolic_array/PE_FP32_Int8_Pipelined.sv
+    - hw/rtl/systolic_array/PE_FP32_Int8.sv
+    - hw/rtl/systolic_array/PE_FP32_Pipelined.sv
+    - hw/rtl/systolic_array/PE_FP32.sv
+    - hw/rtl/systolic_array/PE.sv
+    - hw/rtl/systolic_array/SA_FP32_Int8_Pipelined.sv
+    - hw/rtl/systolic_array/SA_FP32_Int8.sv
+    - hw/rtl/systolic_array/SA_FP32_Pipelined.sv
+    - hw/rtl/systolic_array/SA_FP32.sv
+    - hw/rtl/systolic_array/Spinal_HDL_FP32_Add_Latency3.sv
+    - hw/rtl/systolic_array/Spinal_HDL_FP32_Add.sv
+    - hw/rtl/systolic_array/Spinal_HDL_FP32_Mul_Latency2.sv
+    - hw/rtl/systolic_array/Spinal_HDL_FP32_Mul.sv
+    - hw/rtl/systolic_array/TicSAT_FP32_Int8_Pipelined.sv
+    - hw/rtl/systolic_array/TicSAT_FP32_Int8.sv
+    - hw/rtl/systolic_array/TicSAT_FP32_Pipelined.sv
+    - hw/rtl/systolic_array/TicSAT_FP32.sv
+
     file_type: systemVerilogSource
 
   x_heep_system:
