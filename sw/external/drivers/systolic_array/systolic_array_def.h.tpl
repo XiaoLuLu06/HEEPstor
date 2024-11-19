@@ -16,9 +16,9 @@
 #define WEIGHT_SIZE 8
 
 // How many activations can fit in a single bus transaction
-#define ACTIVATIONS_PER_BUS_TRANSACTION (BUS_SIZE / ACTIVATION_SIZE)
+#define ACTIVATIONS_PER_BUS (BUS_SIZE / ACTIVATION_SIZE)
 
 // How many Weights can fit in a single bus transaction
-#define WEIGHTS_PER_BUS_TRANSACTION (BUS_SIZE / WEIGHT_SIZE)
+#define WEIGHTS_PER_BUS (BUS_SIZE / WEIGHT_SIZE)
 
 #endif _SYSTOLIC_ARRAY_DEF_H_

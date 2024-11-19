@@ -5,6 +5,7 @@
 #include "systolic_array.h"
 #include "heepstor.h"
 #include "floating_point_ops.h"
+#include "heepstor_assert.h"
 
 float __attribute__ ((noinline)) float_add(float a, float b){
     return a + b;
@@ -73,9 +74,97 @@ void run_fp32_test_suite(volatile float a, volatile float b) {
       printf("\n");     
 }
 
+template<size_t M, size_t N>
+void print_matrix(float m[M][N]) {
+  printf("[");
+  for (size_t i = 0; i < M; i++) {
+      printf("[");
+      
+      for (size_t j = 0; j < N; j++) {
+          printFloat(m[i][j]);
+          if (j < N-1) printf(", ");
+      }
+      printf("]");
+      if (i < M-1) printf("\n ");
+  }
+  printf("]\n");
+}
+
+void test_systolic_array_size_4() {
+  SystolicArray systolic_array = SystolicArray::get_default();      
+
+  float lhs[5][4] = {
+    { 1.0, 2.0, 3.0, 4.0 }, 
+    { 5.0, 6.0, 7.0, 8.0 }, 
+    { 9.0, 10.0, 11.0, 12.0 }, 
+    { 13.0, 14.0, 15.0, 16.0 },
+    { 17.0, 18.0, 19.0, 20.0 }, 
+  };
+
+  printf("LHS: \n");
+  print_matrix<5, 4>(lhs);
+
+  uint32_t weights[] = {
+      0x01000000,
+      0x00010000,
+      0x00000100,
+      0x00000001,
+  };
+
+  // uint32_t weights[] = {
+  //     0x01000000,
+  //     0x00020000,
+  //     0x00000300,
+  //     0x00000004,
+  // };
+
+  float res[5][4] = {0};
+  systolic_array.matrix_matrix_multiply(&lhs[0][0], weights, &res[0][0], 2, 4, 4);
+  
+  printf("Res: \n");
+  print_matrix<5, 4>(res); 
+}
+
+void test_systolic_array_size_8() {
+  SystolicArray systolic_array = SystolicArray::get_default();      
+
+  float lhs[2][8] = {
+    { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0 }, 
+    { 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0 },
+  };
+
+  printf("LHS: \n");
+  print_matrix<2, 8>(lhs);
+
+  uint32_t weights[] = {
+      0x01000000, 0x00000000,
+      0x00010000, 0x00000000,
+      0x00000100, 0x00000000,
+      0x00000001, 0x00000000,
+      0x00000000, 0x01000000,
+      0x00000000, 0x00010000,
+      0x00000000, 0x00000100,
+      0x00000000, 0x00000001
+  };
+
+  // uint32_t weights[] = {
+  //     0x01000000,
+  //     0x00020000,
+  //     0x00000300,
+  //     0x00000004,
+  // };
+
+  float res[2][8] = {0};
+  systolic_array.matrix_matrix_multiply(&lhs[0][0], weights, &res[0][0], 2, 8, 8);
+  
+  printf("Res: \n");
+  print_matrix<2, 8>(res); 
+}
+
 int main(int argc, char *argv[])
 {
-    printf("Hello, heepstor!");
+    printf("\n");
+    printf("Hello, heepstor! \n");
 
     // 1. Enable the Floating-Point Unit
     {
@@ -95,11 +184,7 @@ int main(int argc, char *argv[])
 
     // 3. Use the systolic array peripheral
     {
-      SystolicArray systolic_array {mmio_region_from_addr(SYSTOLIC_ARRAY_START_ADDRESS)};
-      systolic_array.write(0x12340, 23);
-
-      uint32_t res = systolic_array.read(0x42);
-      printf("Read result: 0x%x\n", res);
+      test_systolic_array_size_4();
     }
     
     return EXIT_SUCCESS;
