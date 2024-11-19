@@ -4,6 +4,7 @@
 
 #include "systolic_array.h"
 #include "heepstor.h"
+#include "floating_point_ops.h"
 
 float __attribute__ ((noinline)) float_add(float a, float b){
     return a + b;
@@ -42,8 +43,40 @@ void ftoa(float f, char *buf, size_t bufsiz) {
   snprintf(buf, bufsiz, "%s%d.%04de%d", sign, digits, fraction, exponent);
 }
 
+void printFloat(float x) {
+  static char fbuf[16];
+  ftoa(x, fbuf, sizeof(fbuf));
+  printf("%s", fbuf);
+}
+
+void run_fp32_test_suite(volatile float a, volatile float b) {
+      volatile float res = float_add(a,  b);
+
+      printf("add: ");
+      printFloat(res);
+      printf("\n");
+      
+      printf("std exp:");
+      printFloat(__builtin_expf(res));
+      printf("\n");
+
+      printf("fastfloorf: ");
+      printFloat(fastfloorf(res));
+      printf("\n");      
+
+      printf("fastexp2: ");
+      printFloat(fastexp2(res));
+      printf("\n");      
+
+      printf("fastexp: ");
+      printFloat(fastexp(res));
+      printf("\n");     
+}
+
 int main(int argc, char *argv[])
 {
+    printf("Hello, heepstor!");
+
     // 1. Enable the Floating-Point Unit
     {
       printf("Enabling FPU...\n");
@@ -51,12 +84,13 @@ int main(int argc, char *argv[])
       printf("FPU enabled!\n");
     }
 
-    // 2. Test adding two floats
+    // 2. Test floating poinit operations
     {
-      volatile float res = float_add(1.2,  3.14);
-      char fbuf[16];
-      ftoa(res, fbuf, sizeof(fbuf));
-      printf("hello world from Heepstor! float: %s\n", fbuf);
+        printf("\n");
+        run_fp32_test_suite(1.2, 3.14);
+        printf("\n");
+        run_fp32_test_suite(-5.6, 0.7);
+        printf("\n");
     }
 
     // 3. Use the systolic array peripheral
