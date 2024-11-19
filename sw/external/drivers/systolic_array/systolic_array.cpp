@@ -65,7 +65,7 @@ inline bool should_stream_systolic_array(size_t idx)
   return idx % SYSTOLIC_ARRAY_SIZE == (SYSTOLIC_ARRAY_SIZE - 1);
 }
 
-// TODO: At some point, remove HEEPSTOR_ASSERT
+// TODO: At some point, remove HEEPSTOR_ASSERT to improve performance
 void SystolicArray::matrix_matrix_multiply(float *lhs, uint32_t *rhs, float *out, size_t M, size_t N, size_t P)
 {
   size_t lhs_size = M * N;
@@ -84,8 +84,6 @@ void SystolicArray::matrix_matrix_multiply(float *lhs, uint32_t *rhs, float *out
     write_weights(weights_ptr[i]);    
   }
 
-//  printWeights(0);
-
   //////////////////////////////////////////////////////////////
   /// 2. Stream the lhs values into the systolic array inputs
   //////////////////////////////////////////////////////////////
@@ -96,20 +94,21 @@ void SystolicArray::matrix_matrix_multiply(float *lhs, uint32_t *rhs, float *out
   float* outPtr = out;
   float* lastOut = out + out_size;
 
-//  uint32_t systolic_array_first_input_with_valid_output = (SA_SIZE_NUM_WORDS * (2 * SA_SIZE - 1) - 1);
   uint32_t systolic_array_first_stream_with_valid_output = 2*SYSTOLIC_ARRAY_SIZE;
-
-  float* inPtr = lhs;
-  float* lastIn = lhs + lhs_size;
 
   size_t num_streams_to_systolic_array = 0;
 
-  auto stream_or_queue_and_store_result_if_valid = [&](size_t idx, float input_value) {
-    float res;
-    
+  auto stream_or_queue_and_store_result_if_valid = [&](size_t idx, float input_value) {    
     // First, normalize the index to a column
     idx %= SYSTOLIC_ARRAY_SIZE;
 
+    // If the output is valid, store the result. NOTE: It's important to compute whether the input
+    //  is valid before *streaming*. I.e., if this is the STREAM command that will make the output valid,
+    //  the first valid item won't be the result of the STREAM, but the next QUEUE at index 0.  
+    bool isOutputValid = num_streams_to_systolic_array >=
+                         systolic_array_first_stream_with_valid_output;
+
+    float res;
     if (idx == (SYSTOLIC_ARRAY_SIZE - 1)) {
         //  Stream
         res = stream(idx, input_value); 
@@ -119,10 +118,6 @@ void SystolicArray::matrix_matrix_multiply(float *lhs, uint32_t *rhs, float *out
         res = queue(idx, input_value);
     }
 
-    // If the output is valid, store the result
-    bool isOutputValid = num_streams_to_systolic_array >=
-                         systolic_array_first_stream_with_valid_output;
-
     if (isOutputValid) {
       HEEPSTOR_ASSERT(outPtr < lastOut);
       *outPtr = res;
@@ -130,12 +125,12 @@ void SystolicArray::matrix_matrix_multiply(float *lhs, uint32_t *rhs, float *out
     }
   };
 
+  float* inPtr = lhs;
+  float* lastIn = lhs + lhs_size;
+
   size_t idx;
 
-//  std::cout << "M: " << M << std::endl;
-//  std::cout << "M * SA_SIZE " << M * SA_SIZE << std::endl;
-
-  // Iterate through the whole input matrix
+  // Iterate through the whole input matrix of size M * N
   for(idx = 0; idx < M * SYSTOLIC_ARRAY_SIZE; idx += ACTIVATIONS_PER_BUS) {
     HEEPSTOR_ASSERT(inPtr < lastIn);
     

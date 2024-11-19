@@ -57,7 +57,7 @@ void run_fp32_test_suite(volatile float a, volatile float b) {
       printFloat(res);
       printf("\n");
       
-      printf("std exp:");
+      printf("std exp: ");
       printFloat(__builtin_expf(res));
       printf("\n");
 
@@ -137,7 +137,7 @@ void test_systolic_array_size_8() {
   print_matrix<2, 8>(lhs);
 
   uint32_t weights[] = {
-      0x01000000, 0x00000000,
+      0x81000000, 0x00000000,
       0x00010000, 0x00000000,
       0x00000100, 0x00000000,
       0x00000001, 0x00000000,
@@ -164,7 +164,11 @@ void test_systolic_array_size_8() {
 int main(int argc, char *argv[])
 {
     printf("\n");
-    printf("Hello, heepstor! \n");
+    printf("====================================\n");
+    printf("Hello from HEEPstor! \n");
+    printf("SYSTOLIC_ARRAY_SIZE=%u\n", SystolicArray::SIZE);
+    printf("====================================\n");
+    printf("\n");
 
     // 1. Enable the Floating-Point Unit
     {

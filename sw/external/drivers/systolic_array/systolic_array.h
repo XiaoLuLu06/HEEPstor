@@ -4,9 +4,12 @@
 
 #include "mmio.h"
 #include "core_v_mini_mcu.h"
+#include "systolic_array_def.h"
 
 class SystolicArray {
 public:
+    constexpr static size_t SIZE = SYSTOLIC_ARRAY_SIZE;
+
     static SystolicArray get_default();
 
     SystolicArray(mmio_region_t base_addr);
