@@ -9,3 +9,5 @@ int32_t fastfloorf(float x);
 float fastexp2(float p);
 
 float fastexp(float p);
+
+void printFloat(float x);

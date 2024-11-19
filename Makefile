@@ -21,7 +21,7 @@ PROJECT ?= hello_world
 
 # TODO: Play with number of MEMORY_BANKS in the future
 
-#MEMORY_BANKS ?= 2 # Multiple of 2
+MEMORY_BANKS ?= 16 # Multiple of 2
 #MEMORY_BANKS_IL ?= 4 # Power of 2
   
 export HEEP_DIR = hw/vendor/esl_epfl_x_heep/
