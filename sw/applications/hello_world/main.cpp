@@ -139,5 +139,7 @@ int main(int argc, char* argv[]) {
         printf("Available bytes: %d, Used bytes: %d\n", StaticArenaAllocator::available_bytes(), StaticArenaAllocator::used_bytes());
     }
 
+    // TODO: Test two's complement to sign+magnitude. Test that -128 saturates to -127.
+
     return EXIT_SUCCESS;
 }

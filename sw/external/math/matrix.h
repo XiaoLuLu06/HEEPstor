@@ -5,6 +5,7 @@
 #include <utility>
 #include "floating_point_ops.h"
 #include "heepstor_assert.h"
+#include "random_number_generator.h"
 #include "static_arena_allocator.h"
 
 template <typename T>
@@ -140,6 +141,59 @@ public:
         for (size_t i = 0; i < rows * cols; ++i) {
             data[i] = value;
         }
+    }
+
+    // Fills the matrix with random float values in [min_val, max_val) using a provided random number generator.
+    //
+    // This method is only available for matrices of type float. Attempting to call it on
+    // matrices of other types will result in a compilation error.
+    template <typename U = T>
+    typename std::enable_if<std::is_same<U, float>::value>::type fill_random(float min_val, float max_val, RandomNumberGenerator& rng) {
+        for (size_t i = 0; i < rows * cols; ++i) {
+            data[i] = rng.rand_float_uniform_range(min_val, max_val);
+        }
+    }
+
+    // Fills the matrix with random float values in [min_val, max_val) using a new random number generator
+    //  initialized with the default seed.
+    //
+    // This method is only available for matrices of type float. Attempting to call it on
+    // matrices of other types will result in a compilation error.
+    template <typename U = T>
+    typename std::enable_if<std::is_same<U, float>::value>::type fill_random(float min_val, float max_val) {
+        RandomNumberGenerator rng;  // Create with default seed
+        fill_random(min_val, max_val, rng);
+    }
+
+    // Creates a square identity matrix of the given size.
+    static Matrix identity(size_t size) {
+        Matrix result(size, size);
+        result.fill(T());
+
+        for (size_t i = 0; i < size; ++i) {
+            result(i, i) = T(1);
+        }
+        return result;
+    }
+
+    // Creates a matrix filled with zeros
+    static Matrix zeros(size_t rows, size_t cols) {
+        Matrix result(rows, cols);
+        result.fill(T());
+        return result;
+    }
+
+    // Creates a matrix of size rows x cols where the elements
+    //  are increasing sequences of integers, for example for a 3x4 matrix:
+    //  [[1,  2,  3,  4]
+    //   [5,  6,  7,  8]
+    //   [9, 10, 11, 12]]
+    static Matrix sequence(size_t rows, size_t cols) {
+        Matrix result(rows, cols);
+        for (size_t i = 0; i < rows * cols; ++i) {
+            result.data[i] = static_cast<T>(i + 1);
+        }
+        return result;
     }
 
     // Getters

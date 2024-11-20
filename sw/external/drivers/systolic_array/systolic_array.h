@@ -14,10 +14,8 @@ public:
 
     SystolicArray(mmio_region_t base_addr);
 
-    // TODO: In the future, maybe add a little piece of hardware to convert 2's complement uint8_t to sign + magnitude when
-    //  loading weights, to avoid the software overhead.
-
-    // four_packed_weights contains four 8-bit *sign+magnitude* packed weights.
+    // four_packed_weights contains four 8-bit *two's complement* packed weights. A weight of -128 will be saturated to -127.
+    //  There's a hardware that converts the 2's complement weights to sign-magnitude on weight load, to avoid software overheads.
     //
     // Weight loading is done in a delay-line fashion.
     // Weights are input in the systolic array in reverse order.

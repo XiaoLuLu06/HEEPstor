@@ -16,6 +16,7 @@ filesets:
     - hw/rtl/heepstor_pkg.sv
     - hw/rtl/systolic_array/TicSAT_pkg.sv
     - hw/rtl/heepstor_top.sv
+    - hw/rtl/twos_complement_to_sign_mag.sv
     - hw/rtl/systolic_array_wrapper.sv
     # Systolic array sources
     - hw/rtl/systolic_array/FIFO_in.sv

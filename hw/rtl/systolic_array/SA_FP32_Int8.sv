@@ -1,4 +1,3 @@
-`include "TicSAT_pkg.sv"
 import TicSAT_pkg::*;
 
 module SA_FP32_Int8 #(

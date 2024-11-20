@@ -273,7 +273,7 @@ def run_distribution_comparison(M, K, N, trials, B_distribution_params):
 if __name__ == "__main__":
     # Define matrix dimensions
     M, K, N = 64, 32, 48
-    trials = 200
+    trials = 1000
     
     # Keep A as standard normal, vary B distribution
     # Each tuple is (mean_B, std_B, description)

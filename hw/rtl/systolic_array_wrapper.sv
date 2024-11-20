@@ -80,7 +80,22 @@ module systolic_array_wrapper
   // The lowest 2 bits of the address will always be 0 for alignment purposes.
   // Therefore, the write offset of a systolic array command will be ((CMD << 18) | (IDX << 2))
 
-  assign input_value = obi_bus_req_i.wdata;
+  logic[31:0] weights_twos_complement;
+  logic[31:0] weights_sign_magnitude;
+
+  twos_complement_to_sign_mag twos_complement_to_sign_magnitude_i (
+   .in(weights_twos_complement),
+   .out(weights_sign_magnitude)
+  );
+
+  // The weights will be loaded in the bus
+  assign weights_twos_complement = obi_bus_req_i.wdata;
+
+  // If the instruction is weight-load, first convert the weights from two's complement to sign+magnitude.
+  // The systolic array expects the weights to be in sign+magnitude format, but we'll expose to the software
+  //  a two's complement interface, to avoid software overhead.
+  assign input_value = (cmd == CMD_WRITE_WEIGHTS) ? weights_sign_magnitude : obi_bus_req_i.wdata;
+
   assign input_idx = req_addr[LOG_SYSTOLIC_ARRAY_SIZE+1:2];
   assign cmd = (obi_bus_req_i.req && obi_bus_req_i.we) ?
                       TicSAT_pkg::command_t'(req_addr[19:18]) : CMD_NONE;
