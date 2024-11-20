@@ -1,4 +1,5 @@
 #pragma once
+
 #include <cstddef>
 #include <initializer_list>
 #include <type_traits>

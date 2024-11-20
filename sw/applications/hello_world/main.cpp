@@ -140,6 +140,7 @@ int main(int argc, char* argv[]) {
     }
 
     // TODO: Test two's complement to sign+magnitude. Test that -128 saturates to -127.
+    // TODO: Add copyright notices + my name to the files.
 
     return EXIT_SUCCESS;
 }
