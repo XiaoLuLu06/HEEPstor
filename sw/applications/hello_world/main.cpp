@@ -62,6 +62,10 @@ float run_random_tests(int m, int n, int p, int num_tests, float min_val, float 
 
         res_hw.fill(0);
         lhs.fill_random(min_val, max_val, rng);
+
+        printf("LHS (#%d): \n", i);
+        lhs.print();
+
         packed_weights.fill_random(-127, 127, rng);
 
         systolic_array.matrix_matrix_multiply(lhs, packed_weights, res_hw);
@@ -206,6 +210,16 @@ int main(int argc, char* argv[]) {
         t(6, 4, 4, 5);
         t(3, 4, 4, 5);
         t(2, 4, 4, 5);
+        t(3, 1, 2, 1);
+
+        // Test small matrices
+        // for (int i = 1; i <= 4; ++i) {
+        //     for (int j = 1; j <= 4; ++j) {
+        //         t(3, i, j, 3);
+        //         t(4, i, j, 3);
+        //         t(10, i, j, 3);
+        //     }
+        // }
 
         printf("\n================================================ \n");
         printf("All random tests max relative err: ");
@@ -220,6 +234,8 @@ int main(int argc, char* argv[]) {
         printf("\n ARENA ALLOCATOR: \n");
         printf("Available bytes: %d, Used bytes: %d\n", StaticArenaAllocator::available_bytes(), StaticArenaAllocator::used_bytes());
     }
+
+    printf("TODO: Disable HEEPSTOR assert for performance!");
 
     // TODO: Test two's complement to sign+magnitude. Test that -128 saturates to -127.
     // TODO: Add copyright notices + my name to the files.

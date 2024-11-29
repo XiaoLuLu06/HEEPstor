@@ -56,7 +56,7 @@ __attribute__((always_inline)) inline bool should_stream_systolic_array(size_t i
     return idx % SYSTOLIC_ARRAY_SIZE == (SYSTOLIC_ARRAY_SIZE - 1);
 }
 
-void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const PackedInt8Matrix& rhs, MatrixTile<float>& out) {
+void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const PackedInt8MatrixTile& rhs, MatrixTile<float>& out) {
     const size_t M = lhs.num_rows();
     const size_t N = lhs.num_cols();
     const size_t P = rhs.num_cols();
@@ -71,16 +71,43 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
     ////////////////////////////////////////////////////
     /// 1. Set the RHS weights in the systolic array
     ////////////////////////////////////////////////////
-    HEEPSTOR_ASSERT(N == SYSTOLIC_ARRAY_SIZE);
-    HEEPSTOR_ASSERT(P == SYSTOLIC_ARRAY_SIZE);
+    HEEPSTOR_ASSERT(N <= SYSTOLIC_ARRAY_SIZE);
+    HEEPSTOR_ASSERT(P <= SYSTOLIC_ARRAY_SIZE);
 
-    // Get raw packed weights and calculate array length
-    const uint32_t* weights_ptr = rhs.get_packed_data();
-    uint32_t weight_array_len = ceil_div((int)(N * P), WEIGHTS_PER_BUS);
+    // printf("Multiplying...\n");
 
-    // Write weights in reverse order
-    for (int i = weight_array_len - 1; i >= 0; --i) {
-        write_weights(weights_ptr[i]);
+    // First write as many rows of 0s as the difference between rhs.num_blocks_rows and SYSTOLIC_ARRAY_SIZE (bottom padding)
+    for (int i = 0; i < SYSTOLIC_ARRAY_SIZE - rhs.num_blocks_rows(); ++i) {
+        for (int j = 0; j < SYSTOLIC_ARRAY_SIZE; j += 4) {
+            // printf("Writing bottom padding 0x0 \n");
+            write_weights(0);
+        }
+    }
+
+    // printf("Bottom padding done!\n");
+    // printf("Stride: %d\n", rhs.get_stride());
+
+    const uint32_t* last_col_ptr = rhs.last_packed_pointer();
+
+    // Now, write the actual weights of the tile
+    for (int i = 0; i < rhs.num_blocks_rows(); ++i) {
+        const uint32_t* ptr = last_col_ptr;
+
+        // First, write as many 0s as the difference between rhs.num_block_cols and SYSTOLIC_ARRAY_SIZE/4 (right padding)
+        for (int j = 0; j < SYSTOLIC_ARRAY_SIZE / 4 - rhs.num_blocks_cols(); ++j) {
+            // printf("Writing right padding 0x0 \n");
+            write_weights(0);
+        }
+
+        // Now actually write the weights
+        for (int j = 0; j < rhs.num_blocks_cols(); ++j) {
+            // printf("Writing weight %#08X (ptr=%#08X) \n", *ptr, (uint32_t)ptr);
+            write_weights(*ptr);
+            ptr--;
+        }
+
+        // Move to the previous column
+        last_col_ptr = rhs.move_pointer_one_row_up(last_col_ptr);
     }
 
     //////////////////////////////////////////////////////////////
@@ -94,12 +121,14 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
     uint32_t systolic_array_first_stream_with_valid_output = 2 * SYSTOLIC_ARRAY_SIZE;
     size_t num_streams_to_systolic_array = 0;
 
-    auto stream_or_queue_and_store_result_if_valid = [&](size_t& idx, bool should_stream, float input_value) {
+    auto stream_or_queue_and_store_result_if_valid = [&](size_t& idx, float input_value) {
         // If the output is valid, store the result
         bool isOutputValid = num_streams_to_systolic_array >= systolic_array_first_stream_with_valid_output;
         float res;
 
-        if (should_stream) {
+        int prev_idx = idx;
+
+        if (idx == SYSTOLIC_ARRAY_SIZE - 1) {
             // printf("Streaming at idx=%d ", idx);
             // printFloat(input_value);
             // printf("\n");
@@ -118,8 +147,13 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
             idx++;
         }
 
-        if (isOutputValid) {
+        // TODO: If Matrix tile size is systolic array, don't need to check prev_idx < out.num_cols(). Maybe fast path?
+        if (isOutputValid && prev_idx < out.num_cols()) {
             HEEPSTOR_ASSERT(out_iterator != out.end());
+            // printf("Saving output at idx=%d: ", idx);
+            // printFloat(res);
+            // printf("\n");
+
             *out_iterator = res;
             ++out_iterator;
         }
@@ -128,8 +162,25 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
     size_t idx = 0;
 
     // Iterate through the whole input matrix
-    for (auto in_iterator = lhs.begin(); in_iterator != lhs.end(); ++in_iterator) {
-        stream_or_queue_and_store_result_if_valid(idx, in_iterator.is_at_last_column(), *in_iterator);
+
+    if (N == SYSTOLIC_ARRAY_SIZE) {
+        // Fast path
+        for (auto in_iterator = lhs.begin(); in_iterator != lhs.end(); ++in_iterator) {
+            stream_or_queue_and_store_result_if_valid(idx, *in_iterator);
+        }
+    } else {
+        // Need to do more special case handling
+        for (auto in_iterator = lhs.begin(); in_iterator != lhs.end(); ++in_iterator) {
+            bool is_last_column = in_iterator.is_at_last_column();
+            if (is_last_column) {
+                stream_or_queue_and_store_result_if_valid(idx, *in_iterator);
+                for (int i = 0; i < SYSTOLIC_ARRAY_SIZE - N; ++i) {
+                    stream_or_queue_and_store_result_if_valid(idx, 0);
+                }
+            } else {
+                stream_or_queue_and_store_result_if_valid(idx, *in_iterator);
+            }
+        }
     }
 
     //////////////////////////////////////////////////////////////
@@ -139,14 +190,16 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
     // Stream remaining values
     while (out_iterator != out.end()) {
         bool should_stream = idx == SYSTOLIC_ARRAY_SIZE - 1;
-        stream_or_queue_and_store_result_if_valid(idx, should_stream, 0.0f);
+        stream_or_queue_and_store_result_if_valid(idx, 0.0f);
     }
 }
 
 void SystolicArray::matrix_matrix_multiply(const Matrix<float>& lhs, const PackedInt8Matrix& rhs, Matrix<float>& out) {
     // TODO: Actually implement tiling here
-    auto lhs_tile = lhs.as_tile();
-    auto rhs_tile = out.as_tile();
+    const auto lhs_tile = lhs.as_tile();
+    const auto rhs_tile = rhs.as_tile();
 
-    matrix_matrix_multiply(lhs_tile, rhs, rhs_tile);
+    auto out_tile = out.as_tile();
+
+    matrix_matrix_multiply(lhs_tile, rhs_tile, out_tile);
 }

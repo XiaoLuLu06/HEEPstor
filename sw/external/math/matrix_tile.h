@@ -89,6 +89,9 @@ public:
     __attribute__((always_inline)) size_t num_rows() const { return num_tile_rows; }
     __attribute__((always_inline)) size_t num_cols() const { return num_tile_cols; }
 
+    size_t get_num_tile_rows() const { return num_tile_rows; }
+    size_t get_num_tile_cols() const { return num_tile_cols; }
+
 private:
     size_t stride;
 };
