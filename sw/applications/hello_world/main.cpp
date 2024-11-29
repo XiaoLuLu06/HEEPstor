@@ -63,8 +63,8 @@ float run_random_tests(int m, int n, int p, int num_tests, float min_val, float 
         res_hw.fill(0);
         lhs.fill_random(min_val, max_val, rng);
 
-        printf("LHS (#%d): \n", i);
-        lhs.print();
+        // printf("LHS (#%d): \n", i);
+        // lhs.print();
 
         packed_weights.fill_random(-127, 127, rng);
 
@@ -165,8 +165,18 @@ void test_systolic_array_size_8() {
 
     systolic_array.matrix_matrix_multiply(lhs, packed_weights, res);
 
+    auto res_sw = lhs.multiply_software_with_packed(packed_weights);
+
     printf("Res: \n");
     res.print();
+
+    printf("Res SW: \n");
+    res_sw.print();
+
+    auto relative_error_percentage = res.relative_error(res_sw) * 100.0f;
+    printf("Relative error: ");
+    printFloat(relative_error_percentage);
+    printf("%%\n");
 }
 
 int main(int argc, char* argv[]) {
@@ -195,7 +205,7 @@ int main(int argc, char* argv[]) {
 
     // 3. Use the systolic array peripheral
     {
-        test_systolic_array_size_4();
+        // test_systolic_array_size_8();
 
         RandomNumberGenerator rng;
 
@@ -206,11 +216,17 @@ int main(int argc, char* argv[]) {
                 std::max(total_max_relative_error_percentage, run_random_tests(m, n, p, num_runs, -1000, 1000, rng));
         };
 
-        t(15, 4, 4, 5);
-        t(6, 4, 4, 5);
-        t(3, 4, 4, 5);
-        t(2, 4, 4, 5);
-        t(3, 1, 2, 1);
+        // t(15, 4, 4, 5);
+        // t(6, 4, 4, 5);
+        // t(3, 4, 4, 5);
+        // t(2, 4, 4, 5);
+        // t(3, 1, 2, 1);
+
+        t(8, 8, 8, 2);
+        t(10, 9, 7, 2);
+        t(8, 9, 10, 2);
+        t(8, 9, 9, 2);
+        t(13, 30, 41, 2);
 
         // Test small matrices
         // for (int i = 1; i <= 4; ++i) {
@@ -235,7 +251,7 @@ int main(int argc, char* argv[]) {
         printf("Available bytes: %d, Used bytes: %d\n", StaticArenaAllocator::available_bytes(), StaticArenaAllocator::used_bytes());
     }
 
-    printf("TODO: Disable HEEPSTOR assert for performance!");
+    printf("TODO: Disable HEEPSTOR assert for performance!\n");
 
     // TODO: Test two's complement to sign+magnitude. Test that -128 saturates to -127.
     // TODO: Add copyright notices + my name to the files.

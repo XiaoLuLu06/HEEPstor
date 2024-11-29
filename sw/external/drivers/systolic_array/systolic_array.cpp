@@ -1,6 +1,7 @@
 // TODO: Create driver
 
 #include "systolic_array.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include "heepstor.h"
@@ -154,7 +155,7 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
             // printFloat(res);
             // printf("\n");
 
-            *out_iterator = res;
+            *out_iterator += res;
             ++out_iterator;
         }
     };
@@ -195,11 +196,43 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
 }
 
 void SystolicArray::matrix_matrix_multiply(const Matrix<float>& lhs, const PackedInt8Matrix& rhs, Matrix<float>& out) {
-    // TODO: Actually implement tiling here
-    const auto lhs_tile = lhs.as_tile();
-    const auto rhs_tile = rhs.as_tile();
+    // Verify input matrix dimensions match for multiplication
+    HEEPSTOR_ASSERT(lhs.num_cols() == rhs.num_rows() && "LHS columns must match RHS rows");
+    HEEPSTOR_ASSERT(out.num_rows() == lhs.num_rows() && "Output matrix rows must match LHS rows");
+    HEEPSTOR_ASSERT(out.num_cols() == rhs.num_cols() && "Output matrix cols must match RHS cols");
 
-    auto out_tile = out.as_tile();
+    const size_t M = lhs.num_rows();  // Number of rows in LHS
+    const size_t N = lhs.num_cols();  // Number of columns in LHS / rows in RHS
+    const size_t P = rhs.num_cols();  // Number of columns in RHS
 
-    matrix_matrix_multiply(lhs_tile, rhs_tile, out_tile);
+    // Calculate number of tiles needed for RHS in both dimensions
+    const size_t N_tiles = (N + SYSTOLIC_ARRAY_SIZE - 1) / SYSTOLIC_ARRAY_SIZE;  // RHS rows
+    const size_t P_tiles = (P + SYSTOLIC_ARRAY_SIZE - 1) / SYSTOLIC_ARRAY_SIZE;  // RHS cols
+
+    // Initialize output matrix to zeros since we'll be accumulating results
+    out.fill(0.0f);
+
+    // Iterate over RHS 2D tiles
+    for (size_t n = 0; n < N_tiles; n++) {
+        const size_t n_start = n * SYSTOLIC_ARRAY_SIZE;
+        const size_t n_size = std::min(static_cast<size_t>(SYSTOLIC_ARRAY_SIZE), N - n_start);
+
+        for (size_t p = 0; p < P_tiles; p++) {
+            const size_t p_start = p * SYSTOLIC_ARRAY_SIZE;
+            const size_t p_size = std::min(static_cast<size_t>(SYSTOLIC_ARRAY_SIZE), P - p_start);
+
+            // Get current RHS tile
+            auto rhs_tile = rhs.get_tile(n_start, p_start, n_size, p_size);
+
+            // Process all rows of LHS against this RHS tile
+            auto lhs_tile = lhs.get_tile(0, n_start, M, n_size);
+            auto out_tile = out.get_tile(0, p_start, M, p_size);
+
+            // printf("Multiplying LHS(%d:%d, %d:%d) * RHS(%d:%d, %d:%d) -> OUT(%d:%d, %d:%d)\n", 0, M - 1, n_start, n_start + n_size - 1, n_start,
+            //        n_start + n_size - 1, p_start, p_start + p_size - 1, 0, M - 1, p_start, p_start + p_size - 1);
+
+            // Perform multiplication
+            matrix_matrix_multiply(lhs_tile, rhs_tile, out_tile);
+        }
+    }
 }
