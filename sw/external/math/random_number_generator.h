@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstdint>
 
 // Based on Xoshiro128+ (https://prng.di.unimi.it/)

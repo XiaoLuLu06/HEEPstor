@@ -1,11 +1,13 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <initializer_list>
 #include <type_traits>
 #include <utility>
 #include "floating_point_ops.h"
 #include "heepstor_assert.h"
+#include "packed_int8_matrix.h"
 #include "random_number_generator.h"
 #include "static_arena_allocator.h"
 
@@ -117,6 +119,32 @@ public:
         return result;
     }
 
+    // Software matrix multiplication with uint8_t packed matrix
+    Matrix multiply_software_with_packed(const PackedInt8Matrix& rhs) {
+        static_assert(std::is_same<T, float>::value, "PackedInt8Matrix multiplication only supported with float matrices");
+        HEEPSTOR_ASSERT(cols == rhs.num_rows() && "Invalid dimensions for multiplication");
+
+        Matrix<T> result(rows, rhs.num_cols());
+
+        multiply_software_with_packed(rhs, result);
+        return result;
+    }
+
+    void multiply_software_with_packed(const PackedInt8Matrix& rhs, Matrix& out) {
+        static_assert(std::is_same<T, float>::value, "PackedInt8Matrix multiplication only supported with float matrices");
+        HEEPSTOR_ASSERT(cols == rhs.num_rows() && "Invalid dimensions for multiplication");
+
+        for (size_t i = 0; i < rows; ++i) {
+            for (size_t j = 0; j < rhs.num_cols(); ++j) {
+                float sum = 0.0f;
+                for (size_t k = 0; k < cols; ++k) {
+                    sum += (*this)(i, k) * static_cast<float>(rhs(k, j));
+                }
+                out(i, j) = sum;
+            }
+        }
+    }
+
     void print() const {
         printf("[");
         for (size_t i = 0; i < rows; i++) {
@@ -195,6 +223,24 @@ public:
             result.data[i] = static_cast<T>(i + 1);
         }
         return result;
+    }
+
+    // Computes the maximum relative error between elements of the matrices: max(abs((a - b) / (a + eps)))
+    // Uses an epsilon value in the denominator to handle zero reference values.
+    T relative_error(const Matrix& ground_truth) const {
+        HEEPSTOR_ASSERT(rows == ground_truth.rows && cols == ground_truth.cols && "Matrix dimensions must match for relative error computation");
+
+        // Define epsilon based on the type T
+        const T eps = std::is_same<T, float>::value ? 1e-6f : std::is_same<T, double>::value ? 1e-10 : T(1);
+
+        T max_error = T{};
+        for (size_t i = 0; i < rows * cols; ++i) {
+            // Add epsilon to denominator to handle zero values
+            T rel_err = std::abs((data[i] - ground_truth.data[i]) / (std::abs(data[i]) + eps));
+            max_error = std::max(max_error, rel_err);
+        }
+
+        return max_error;
     }
 
     // Getters

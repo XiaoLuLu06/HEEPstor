@@ -1,11 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <algorithm>
 #include "csr.h"
 #include "matrix.h"
 
 #include "floating_point_ops.h"
 #include "heepstor.h"
 #include "heepstor_assert.h"
+#include "packed_int8_matrix.h"
 #include "static_arena_allocator.h"
 #include "systolic_array.h"
 
@@ -41,6 +43,53 @@ void run_fp32_test_suite(volatile float a, volatile float b) {
     printf("\n");
 }
 
+void run_random_tests(int m, int n, int p, int num_tests, float min_val, float max_val, RandomNumberGenerator rng) {
+    SystolicArray systolic_array = SystolicArray::get_default();
+
+    Matrix<float> lhs(m, n);
+
+    Matrix<float> res_hw(m, p);
+    Matrix<float> res_sw(m, p);
+
+    auto packed_weights = PackedInt8Matrix::allocate(n, p);
+
+    float relative_error_percentage_sum = 0;
+    float relative_error_percentage_max = -1;
+
+    for (int i = 0; i < num_tests; ++i) {
+        printf("\n########### TEST NUM %d ###########\n\n", i);
+
+        res_hw.fill(0);
+        lhs.fill_random(min_val, max_val, rng);
+        packed_weights.fill_random(-127, 127, rng);
+
+        systolic_array.matrix_matrix_multiply(lhs, packed_weights, res_hw);
+        lhs.multiply_software_with_packed(packed_weights, res_sw);
+
+        printf("Res HW (#%d): \n", i);
+        res_hw.print();
+
+        printf("Res SW (#%d): \n", i);
+        res_sw.print();
+
+        auto relative_error_percentage = res_hw.relative_error(res_sw) * 100.0f;
+        printf("Relative error (#%d): ", i);
+        printFloat(relative_error_percentage);
+        printf("%%\n");
+
+        relative_error_percentage_sum += relative_error_percentage;
+        relative_error_percentage_max = std::max(relative_error_percentage_max, relative_error_percentage);
+    }
+
+    printf("\n ########## STATISTICAL RESULTS #############\n\n");
+    printf("Average relative error: ");
+    printFloat(relative_error_percentage_sum / num_tests);
+    printf("%%\n");
+    printf("Max relative error: ");
+    printFloat(relative_error_percentage_max);
+    printf("%%\n");
+}
+
 void test_systolic_array_size_4() {
     SystolicArray systolic_array = SystolicArray::get_default();
 
@@ -55,20 +104,31 @@ void test_systolic_array_size_4() {
     printf("LHS: \n");
     lhs.print();
 
-    uint32_t weights[] = {
-        0x01000000,
-        0x00010000,
-        0x00000100,
-        0x00000001,
-    };
+    // auto packed_weights = PackedInt8Matrix::allocate_from_int8_list({{1, 0, 0, 0},  //
+    //                                                                  {0, -1, 0, 0},
+    //                                                                  {0, 0, 1, 0},
+    //                                                                  {0, 0, 0, 1}});
+
+    auto packed_weights = PackedInt8Matrix::allocate(4, 4);
+    packed_weights.fill_diag(-2);
 
     Matrix<float> res(5, 4);
     res.fill(0);
 
-    systolic_array.matrix_matrix_multiply(lhs.get_data(), weights, res.get_data(), 5, 4, 4);
+    systolic_array.matrix_matrix_multiply(lhs, packed_weights, res);
+
+    auto res_sw = lhs.multiply_software_with_packed(packed_weights);
 
     printf("Res: \n");
     res.print();
+
+    printf("Res SW: \n");
+    res_sw.print();
+
+    auto relative_error_percentage = res.relative_error(res_sw) * 100.0f;
+    printf("Relative error: ");
+    printFloat(relative_error_percentage);
+    printf("%%\n");
 }
 
 void test_systolic_array_size_8() {
@@ -82,21 +142,21 @@ void test_systolic_array_size_8() {
     printf("LHS: \n");
     lhs.print();
 
-    uint32_t weights[] = {
-        0x81000000, 0x00000000,  //
-        0x00010000, 0x00000000,  //
-        0x00000100, 0x00000000,  //
-        0x00000001, 0x00000000,  //
-        0x00000000, 0x01000000,  //
-        0x00000000, 0x00010000,  //
-        0x00000000, 0x00000100,  //
-        0x00000000, 0x00000001,
-    };
+    auto packed_weights = PackedInt8Matrix::allocate_from_int8_list({
+        {1, 0, 0, 0, 0, 0, 0, 0},  //
+        {0, 1, 0, 0, 0, 0, 0, 0},
+        {0, 0, 1, 0, 0, 0, 0, 0},
+        {0, 0, 0, 1, 0, 0, 0, 0},
+        {0, 0, 0, 0, 1, 0, 0, 0},
+        {0, 0, 0, 0, 0, 1, 0, 0},
+        {0, 0, 0, 0, 0, 0, 1, 0},
+        {0, 0, 0, 0, 0, 0, 0, 1},
+    });
 
     Matrix<float> res(2, 8);
     res.fill(0);
 
-    systolic_array.matrix_matrix_multiply(lhs.get_data(), weights, res.get_data(), 2, 8, 8);
+    systolic_array.matrix_matrix_multiply(lhs, packed_weights, res);
 
     printf("Res: \n");
     res.print();
@@ -129,6 +189,11 @@ int main(int argc, char* argv[]) {
     // 3. Use the systolic array peripheral
     {
         test_systolic_array_size_4();
+
+        RandomNumberGenerator rng;
+
+        run_random_tests(6, 4, 4, 5, -1000, 1000, rng);
+        run_random_tests(2, 4, 4, 5, -1000, 1000, rng);
 
         // TODO: Disable HEEPSTOR assert, make it a Makefile option
     }

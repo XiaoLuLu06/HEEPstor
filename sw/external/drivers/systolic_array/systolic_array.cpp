@@ -55,10 +55,17 @@ __attribute__((always_inline)) inline bool should_stream_systolic_array(size_t i
     return idx % SYSTOLIC_ARRAY_SIZE == (SYSTOLIC_ARRAY_SIZE - 1);
 }
 
-// TODO: At some point, remove HEEPSTOR_ASSERT to improve performance
-void SystolicArray::matrix_matrix_multiply(float* lhs, uint32_t* rhs, float* out, size_t M, size_t N, size_t P) {
-    size_t lhs_size = M * N;
-    size_t out_size = M * P;
+void SystolicArray::matrix_matrix_multiply(const Matrix<float>& lhs, const PackedInt8Matrix& rhs, Matrix<float>& out) {
+    const size_t M = lhs.num_rows();
+    const size_t N = lhs.num_cols();
+    const size_t P = rhs.num_cols();
+
+    // Verify input matrix dimensions match for multiplication
+    HEEPSTOR_ASSERT(lhs.num_cols() == rhs.num_rows() && "LHS columns must match RHS rows");
+
+    // Verify output matrix dimensions
+    HEEPSTOR_ASSERT(out.num_rows() == M && "Output matrix rows must match LHS rows");
+    HEEPSTOR_ASSERT(out.num_cols() == P && "Output matrix cols must match RHS cols");
 
     ////////////////////////////////////////////////////
     /// 1. Set the RHS weights in the systolic array
@@ -66,9 +73,11 @@ void SystolicArray::matrix_matrix_multiply(float* lhs, uint32_t* rhs, float* out
     HEEPSTOR_ASSERT(N == SYSTOLIC_ARRAY_SIZE);
     HEEPSTOR_ASSERT(P == SYSTOLIC_ARRAY_SIZE);
 
-    uint32_t* weights_ptr = rhs;
+    // Get raw packed weights and calculate array length
+    const uint32_t* weights_ptr = rhs.get_packed_data();
     uint32_t weight_array_len = ceil_div((int)(N * P), WEIGHTS_PER_BUS);
 
+    // Write weights in reverse order
     for (int i = weight_array_len - 1; i >= 0; --i) {
         write_weights(weights_ptr[i]);
     }
@@ -76,33 +85,28 @@ void SystolicArray::matrix_matrix_multiply(float* lhs, uint32_t* rhs, float* out
     //////////////////////////////////////////////////////////////
     /// 2. Stream the lhs values into the systolic array inputs
     //////////////////////////////////////////////////////////////
-
     HEEPSTOR_ASSERT(SYSTOLIC_ARRAY_SIZE >= 4);
     HEEPSTOR_ASSERT(SYSTOLIC_ARRAY_SIZE % 4 == 0);
 
-    float* outPtr = out;
-    float* lastOut = out + out_size;
-
+    float* outPtr = out.get_data();
+    float* lastOut = outPtr + (M * P);
     uint32_t systolic_array_first_stream_with_valid_output = 2 * SYSTOLIC_ARRAY_SIZE;
-
     size_t num_streams_to_systolic_array = 0;
 
     auto stream_or_queue_and_store_result_if_valid = [&](size_t idx, float input_value) {
         // First, normalize the index to a column
         idx %= SYSTOLIC_ARRAY_SIZE;
 
-        // If the output is valid, store the result. NOTE: It's important to compute whether the input
-        //  is valid before *streaming*. I.e., if this is the STREAM command that will make the output valid,
-        //  the first valid item won't be the result of the STREAM, but the next QUEUE at index 0.
+        // If the output is valid, store the result
         bool isOutputValid = num_streams_to_systolic_array >= systolic_array_first_stream_with_valid_output;
-
         float res;
+
         if (idx == (SYSTOLIC_ARRAY_SIZE - 1)) {
-            //  Stream
+            // Stream
             res = stream(idx, input_value);
             num_streams_to_systolic_array++;
         } else {
-            //  Queue
+            // Queue
             res = queue(idx, input_value);
         }
 
@@ -113,27 +117,22 @@ void SystolicArray::matrix_matrix_multiply(float* lhs, uint32_t* rhs, float* out
         }
     };
 
-    float* inPtr = lhs;
-    float* lastIn = lhs + lhs_size;
-
+    const float* inPtr = lhs.get_data();
+    const float* lastIn = inPtr + (M * N);
     size_t idx;
 
-    // Iterate through the whole input matrix of size M * N
+    // Iterate through the whole input matrix
     for (idx = 0; idx < M * SYSTOLIC_ARRAY_SIZE; idx += ACTIVATIONS_PER_BUS) {
         HEEPSTOR_ASSERT(inPtr < lastIn);
-
         float input_activation = *inPtr;
         inPtr++;
-
         stream_or_queue_and_store_result_if_valid(idx, input_activation);
     }
 
     //////////////////////////////////////////////////////////////
     /// 3. Stream out the remaining values
     //////////////////////////////////////////////////////////////
-
-    // Maybe there are some remaining values that need to be streamed out
-
+    // Stream remaining values
     for (; outPtr < lastOut; idx += ACTIVATIONS_PER_BUS) {
         stream_or_queue_and_store_result_if_valid(idx, 0.0f);
     }
