@@ -205,7 +205,8 @@ int main(int argc, char* argv[]) {
 
     // 3. Use the systolic array peripheral
     {
-        // test_systolic_array_size_8();
+        test_systolic_array_size_4();
+        test_systolic_array_size_8();
 
         RandomNumberGenerator rng;
 
@@ -216,11 +217,11 @@ int main(int argc, char* argv[]) {
                 std::max(total_max_relative_error_percentage, run_random_tests(m, n, p, num_runs, -1000, 1000, rng));
         };
 
-        // t(15, 4, 4, 5);
-        // t(6, 4, 4, 5);
-        // t(3, 4, 4, 5);
-        // t(2, 4, 4, 5);
-        // t(3, 1, 2, 1);
+        t(15, 4, 4, 5);
+        t(6, 4, 4, 5);
+        t(3, 4, 4, 5);
+        t(2, 4, 4, 5);
+        t(3, 1, 2, 1);
 
         t(8, 8, 8, 2);
         t(10, 9, 7, 2);
@@ -229,13 +230,13 @@ int main(int argc, char* argv[]) {
         t(13, 30, 41, 2);
 
         // Test small matrices
-        // for (int i = 1; i <= 4; ++i) {
-        //     for (int j = 1; j <= 4; ++j) {
-        //         t(3, i, j, 3);
-        //         t(4, i, j, 3);
-        //         t(10, i, j, 3);
-        //     }
-        // }
+        for (int i = 1; i <= 4; ++i) {
+            for (int j = 1; j <= 4; ++j) {
+                t(3, i, j, 3);
+                t(4, i, j, 3);
+                t(10, i, j, 3);
+            }
+        }
 
         printf("\n================================================ \n");
         printf("All random tests max relative err: ");
