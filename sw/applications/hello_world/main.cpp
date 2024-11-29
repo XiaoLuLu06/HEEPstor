@@ -43,7 +43,8 @@ void run_fp32_test_suite(volatile float a, volatile float b) {
     printf("\n");
 }
 
-void run_random_tests(int m, int n, int p, int num_tests, float min_val, float max_val, RandomNumberGenerator rng) {
+// Returns max_relative_error_percentage
+float run_random_tests(int m, int n, int p, int num_tests, float min_val, float max_val, RandomNumberGenerator rng) {
     SystolicArray systolic_array = SystolicArray::get_default();
 
     Matrix<float> lhs(m, n);
@@ -88,6 +89,8 @@ void run_random_tests(int m, int n, int p, int num_tests, float min_val, float m
     printf("Max relative error: ");
     printFloat(relative_error_percentage_max);
     printf("%%\n");
+
+    return relative_error_percentage_max;
 }
 
 void test_systolic_array_size_4() {
@@ -192,8 +195,22 @@ int main(int argc, char* argv[]) {
 
         RandomNumberGenerator rng;
 
-        run_random_tests(6, 4, 4, 5, -1000, 1000, rng);
-        run_random_tests(2, 4, 4, 5, -1000, 1000, rng);
+        float total_max_relative_error_percentage = -1;
+
+        auto t = [&](int m, int n, int p, int num_runs) {
+            total_max_relative_error_percentage =
+                std::max(total_max_relative_error_percentage, run_random_tests(m, n, p, num_runs, -1000, 1000, rng));
+        };
+
+        t(15, 4, 4, 5);
+        t(6, 4, 4, 5);
+        t(3, 4, 4, 5);
+        t(2, 4, 4, 5);
+
+        printf("\n================================================ \n");
+        printf("All random tests max relative err: ");
+        printFloat(total_max_relative_error_percentage);
+        printf("%%\n================================================ \n");
 
         // TODO: Disable HEEPSTOR assert, make it a Makefile option
     }

@@ -1,6 +1,7 @@
 // TODO: Create driver
 
 #include "systolic_array.h"
+#include <cstdio>
 #include <cstring>
 #include "heepstor.h"
 #include "heepstor_assert.h"
@@ -55,7 +56,7 @@ __attribute__((always_inline)) inline bool should_stream_systolic_array(size_t i
     return idx % SYSTOLIC_ARRAY_SIZE == (SYSTOLIC_ARRAY_SIZE - 1);
 }
 
-void SystolicArray::matrix_matrix_multiply(const Matrix<float>& lhs, const PackedInt8Matrix& rhs, Matrix<float>& out) {
+void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const PackedInt8Matrix& rhs, MatrixTile<float>& out) {
     const size_t M = lhs.num_rows();
     const size_t N = lhs.num_cols();
     const size_t P = rhs.num_cols();
@@ -88,52 +89,64 @@ void SystolicArray::matrix_matrix_multiply(const Matrix<float>& lhs, const Packe
     HEEPSTOR_ASSERT(SYSTOLIC_ARRAY_SIZE >= 4);
     HEEPSTOR_ASSERT(SYSTOLIC_ARRAY_SIZE % 4 == 0);
 
-    float* outPtr = out.get_data();
-    float* lastOut = outPtr + (M * P);
+    auto out_iterator = out.begin();
+
     uint32_t systolic_array_first_stream_with_valid_output = 2 * SYSTOLIC_ARRAY_SIZE;
     size_t num_streams_to_systolic_array = 0;
 
-    auto stream_or_queue_and_store_result_if_valid = [&](size_t idx, float input_value) {
-        // First, normalize the index to a column
-        idx %= SYSTOLIC_ARRAY_SIZE;
-
+    auto stream_or_queue_and_store_result_if_valid = [&](size_t& idx, bool should_stream, float input_value) {
         // If the output is valid, store the result
         bool isOutputValid = num_streams_to_systolic_array >= systolic_array_first_stream_with_valid_output;
         float res;
 
-        if (idx == (SYSTOLIC_ARRAY_SIZE - 1)) {
+        if (should_stream) {
+            // printf("Streaming at idx=%d ", idx);
+            // printFloat(input_value);
+            // printf("\n");
+
             // Stream
             res = stream(idx, input_value);
             num_streams_to_systolic_array++;
+            idx = 0;
         } else {
+            // printf("Queuing at idx=%d ", idx);
+            // printFloat(input_value);
+            // printf("\n");
+
             // Queue
             res = queue(idx, input_value);
+            idx++;
         }
 
         if (isOutputValid) {
-            HEEPSTOR_ASSERT(outPtr < lastOut);
-            *outPtr = res;
-            outPtr++;
+            HEEPSTOR_ASSERT(out_iterator != out.end());
+            *out_iterator = res;
+            ++out_iterator;
         }
     };
 
-    const float* inPtr = lhs.get_data();
-    const float* lastIn = inPtr + (M * N);
-    size_t idx;
+    size_t idx = 0;
 
     // Iterate through the whole input matrix
-    for (idx = 0; idx < M * SYSTOLIC_ARRAY_SIZE; idx += ACTIVATIONS_PER_BUS) {
-        HEEPSTOR_ASSERT(inPtr < lastIn);
-        float input_activation = *inPtr;
-        inPtr++;
-        stream_or_queue_and_store_result_if_valid(idx, input_activation);
+    for (auto in_iterator = lhs.begin(); in_iterator != lhs.end(); ++in_iterator) {
+        stream_or_queue_and_store_result_if_valid(idx, in_iterator.is_at_last_column(), *in_iterator);
     }
 
     //////////////////////////////////////////////////////////////
     /// 3. Stream out the remaining values
     //////////////////////////////////////////////////////////////
+
     // Stream remaining values
-    for (; outPtr < lastOut; idx += ACTIVATIONS_PER_BUS) {
-        stream_or_queue_and_store_result_if_valid(idx, 0.0f);
+    while (out_iterator != out.end()) {
+        bool should_stream = idx == SYSTOLIC_ARRAY_SIZE - 1;
+        stream_or_queue_and_store_result_if_valid(idx, should_stream, 0.0f);
     }
+}
+
+void SystolicArray::matrix_matrix_multiply(const Matrix<float>& lhs, const PackedInt8Matrix& rhs, Matrix<float>& out) {
+    // TODO: Actually implement tiling here
+    auto lhs_tile = lhs.as_tile();
+    auto rhs_tile = out.as_tile();
+
+    matrix_matrix_multiply(lhs_tile, rhs, rhs_tile);
 }

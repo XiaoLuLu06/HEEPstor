@@ -7,6 +7,7 @@
 #include <utility>
 #include "floating_point_ops.h"
 #include "heepstor_assert.h"
+#include "matrix_tile.h"
 #include "packed_int8_matrix.h"
 #include "random_number_generator.h"
 #include "static_arena_allocator.h"
@@ -242,6 +243,20 @@ public:
 
         return max_error;
     }
+
+    MatrixTile<T> get_tile(size_t start_row, size_t start_col, size_t tile_rows, size_t tile_cols) {
+        HEEPSTOR_ASSERT(start_row + tile_rows <= rows && start_col + tile_cols <= cols);
+        return MatrixTile<T>(data, rows, cols, start_row, start_col, tile_rows, tile_cols);
+    }
+
+    const MatrixTile<T> get_tile(size_t start_row, size_t start_col, size_t tile_rows, size_t tile_cols) const {
+        HEEPSTOR_ASSERT(start_row + tile_rows <= rows && start_col + tile_cols <= cols);
+        return MatrixTile<T>(data, rows, cols, start_row, start_col, tile_rows, tile_cols);
+    }
+
+    MatrixTile<T> as_tile() { return MatrixTile<T>(data, rows, cols, 0, 0, rows, cols); }
+
+    const MatrixTile<T> as_tile() const { return MatrixTile<T>(data, rows, cols, 0, 0, rows, cols); }
 
     // Getters
     size_t num_rows() const { return rows; }

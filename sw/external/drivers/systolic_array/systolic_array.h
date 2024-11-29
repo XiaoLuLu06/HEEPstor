@@ -4,6 +4,7 @@
 
 #include "core_v_mini_mcu.h"
 #include "matrix.h"
+#include "matrix_tile.h"
 #include "mmio.h"
 #include "packed_int8_matrix.h"
 #include "systolic_array_def.h"
@@ -44,6 +45,8 @@ public:
     //  expressed as number of elements, but the weight matrix (rhs) must have already been compressed into 32-bit words.
     // IMPORTANT: The size of the RHS must be the size of the systolic array. If bigger matrices want to be used,
     //  then the big matrix multiplication has to be blocked
+    void matrix_matrix_multiply(const MatrixTile<float>& lhs, const PackedInt8Matrix& rhs, MatrixTile<float>& out);
+
     void matrix_matrix_multiply(const Matrix<float>& lhs, const PackedInt8Matrix& rhs, Matrix<float>& out);
 
 private:
