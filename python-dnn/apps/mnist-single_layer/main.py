@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 import torch
 import torch.nn as nn
 from torchvision import datasets, transforms
@@ -5,6 +7,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import os
 import random
+from heepstorch.module import HeepstorchModule, HeepstorchSequentialNetwork
+import heepstorch
 
 
 def get_model(device):
@@ -12,9 +16,9 @@ def get_model(device):
     #   Instead, we use the nn.CrossEntropyLoss function, which already performs
     #   the softmax inside. Therefore, if probabilities are desired on inference,
     #   the softmax function must be applied to the output of the model.
-    model = nn.Sequential(
-        nn.Linear(28 * 28, 10),
-    ).to(device)
+    model = nn.Sequential(OrderedDict([
+        ('fc0', nn.Linear(28 * 28, 10)),
+    ])).to(device)
     return model
 
 
@@ -71,7 +75,8 @@ def test(model, test_loader, criterion, device, description=""):
     return accuracy
 
 
-def show_random_prediction(model, test_loader, device):
+def show_random_prediction(model, test_loader, device,
+                           heepstorch_seq_baseline: HeepstorchSequentialNetwork | None = None):
     data_iter = iter(test_loader)
     images, labels = next(data_iter)
 
@@ -95,6 +100,14 @@ def show_random_prediction(model, test_loader, device):
     print(f'Predicted: {pred.item()} (with prob {probs[pred.item()]:.2f}). True: {label.item()}')
     print(f'Raw output:')
     print(output)
+
+    if heepstorch_seq_baseline is not None:
+        hp_output = heepstorch_seq_baseline(images[idx:idx + 1].numpy())
+        print('Heepstorch raw output:')
+        print(hp_output)
+        print('Output difference:')
+        print(hp_output - output)
+
     print(f'Probs:')
     print(probs)
 
@@ -137,7 +150,20 @@ def main(retrain, use_gpu_if_available):
     model = load_or_train_model(train_loader, test_loader, criterion, device, retrain)
 
     test(model, test_loader, criterion, device, "final")
-    show_random_prediction(model, test_loader, device)
+
+    hp_nn = HeepstorchSequentialNetwork.from_torch_sequential(model)
+    quantized_torch_model = hp_nn.get_quantized_torch_module()
+
+    test(quantized_torch_model, test_loader, criterion, device, "quantized")
+    test(model, test_loader, criterion, device, "non-quantized")
+
+    show_random_prediction(model, test_loader, device, hp_nn)
+    show_random_prediction(quantized_torch_model, test_loader, device, hp_nn)
+
+    # print(model[0].weight.data.cpu().detach().numpy())
+    # print(quantized_torch_model[0].weight.data.cpu().detach().numpy())
+    #
+    # print(hp_nn)
 
 
 if __name__ == "__main__":
