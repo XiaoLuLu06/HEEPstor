@@ -194,7 +194,7 @@ int main(int argc, char* argv[]) {
         printf("FPU enabled!\n");
     }
 
-    // 2. Test floating poinit operations
+    // 2. Test floating point operations
     {
         printf("\n");
         run_fp32_test_suite(1.2, 3.14);

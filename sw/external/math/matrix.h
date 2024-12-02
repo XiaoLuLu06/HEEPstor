@@ -75,12 +75,12 @@ public:
     ~Matrix() = default;
 
     // Element access
-    T& operator()(size_t r, size_t c) {
+    __attribute__((always_inline)) T& operator()(size_t r, size_t c) {
         HEEPSTOR_ASSERT(r < rows && c < cols && "Matrix indices out of bounds");
         return data[r * cols + c];
     }
 
-    const T& operator()(size_t r, size_t c) const {
+    __attribute__((always_inline)) const T& operator()(size_t r, size_t c) const {
         HEEPSTOR_ASSERT(r < rows && c < cols && "Matrix indices out of bounds");
         return data[r * cols + c];
     }
@@ -91,6 +91,14 @@ public:
 
         for (size_t i = 0; i < rows * cols; ++i) {
             data[i] += other.data[i];
+        }
+        return *this;
+    }
+
+    // In-place multiplication by constant
+    Matrix& operator*=(float c) {
+        for (size_t i = 0; i < rows * cols; ++i) {
+            data[i] *= c;
         }
         return *this;
     }
