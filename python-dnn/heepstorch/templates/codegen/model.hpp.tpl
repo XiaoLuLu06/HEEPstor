@@ -16,6 +16,8 @@ class Model {
         HEEPSTOR_ASSERT(outputs.num_rows() == NUM_OUTPUT_FEATURES);
         HEEPSTOR_ASSERT(inputs.num_cols() == outputs.num_cols());
 
+        constexpr size_t BATCH_SIZE = inputs.num_cols();
+
         // Wrap the parameters into matrices. Note: The ugly const cast is necessary because
 
         const PackedInt8Matrix fc0_weights = PackedInt8Matrix::from_const_pointer(ModelParameters::fc0_weight_data, 28 * 28, 10);

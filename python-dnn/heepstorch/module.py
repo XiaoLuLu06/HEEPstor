@@ -6,6 +6,8 @@ import numpy.typing as npt
 import numpy as np
 import copy
 
+from networkx import is_isolate
+
 from heepstorch import quantization
 from heepstorch.code_generator import CodeGenerator
 
@@ -39,6 +41,30 @@ class Module(ABC):
         """
         pass
 
+    @abstractmethod
+    def performs_inference_in_place(self) -> bool:
+        """
+        Returns True whenever the module can perform inference in place (that is, the input buffer and the output buffer
+        can be the same). Returns False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def num_input_features(self) -> int | None:
+        """
+        Returns the number of input features required by this module. Returns None if it does not require an specific
+        number of input features.
+        """
+        pass
+
+    @abstractmethod
+    def num_output_features(self) -> int | None:
+        """
+        Returns the number of output features required by this module. Returns None if it does not require an specific
+        number of output features.
+        """
+        pass
+
     @staticmethod
     def from_torch_module(m: torch.nn.Module, name: str) -> 'Module':
         """Convert a PyTorch module to a Module.
@@ -61,8 +87,24 @@ class Module(ABC):
         # For conv, [num_input_channels x image_size], processing a single image at a time.
         if isinstance(m, torch.nn.Linear):
             return Linear(m, name)
+        elif isinstance(m, torch.nn.ReLU):
+            return ReLU(m, name)
         else:
             raise ValueError(f"Unsupported module type in Heepstorch: {type(m)}")
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """
+        Returns the name of the module.
+        """
+        pass
+
+    @abstractmethod
+    def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
+        """
+        Returns the C-code as a string to perform inference using the given input and output buffer names.
+        """
+        pass
 
 
 class Linear(Module):
@@ -86,6 +128,18 @@ class Linear(Module):
 
         self.non_quantized_torch_module = torch_module
         self.quantized_torch_module = self.quantize_torch_module(torch_module)
+
+    def performs_inference_in_place(self) -> bool:
+        return False
+
+    def num_input_features(self) -> int | None:
+        return self.DIM_IN
+
+    def num_output_features(self) -> int | None:
+        return self.DIM_OUT
+
+    def get_name(self) -> str:
+        return self.name
 
     def quantize_torch_module(self, non_quantized_torch_module: torch.nn.Module) -> torch.nn.Module:
         quantized_module = copy.deepcopy(non_quantized_torch_module)
@@ -132,6 +186,46 @@ class Linear(Module):
 
         wrapper = '\n'.join([c_code_wrapper_weights, c_code_wrapper_bias])
         return model_parameter_definitions, wrapper
+
+    def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
+        return f'Linear::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name});'
+
+
+class ReLU(Module):
+    """
+    Linear layer of dimensions [DIM_IN, DIM_OUT]. DIM_IN is the dimensionality of the input and DIM_OUT
+    is the dimensionality of the output.
+    """
+
+    def __init__(self, torch_module: torch.nn.Module, name: str):
+        self.name = name
+        self.torch_module = torch_module
+        self.quantized_torch_module = copy.deepcopy(torch_module)
+
+    def num_input_features(self) -> int | None:
+        return None
+
+    def num_output_features(self) -> int | None:
+        return None
+
+    def performs_inference_in_place(self) -> bool:
+        return True
+
+    def get_name(self) -> str:
+        return self.name
+
+    def forward_quantized(self, x: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        return np.maximum(x, 0)
+
+    def get_quantized_torch_module(self) -> torch.nn.Module:
+        return self.quantized_torch_module
+
+    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str):
+        return None, None
+
+    def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
+        assert input_buffer_name == output_buffer_name
+        return f'ReLU::forward({input_buffer_name});'
 
 
 class SequentialNetwork:

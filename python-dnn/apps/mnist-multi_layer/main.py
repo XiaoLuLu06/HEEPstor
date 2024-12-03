@@ -17,8 +17,12 @@ def get_model(device):
     #   Instead, we use the nn.CrossEntropyLoss function, which already performs
     #   the softmax inside. Therefore, if probabilities are desired on inference,
     #   the softmax function must be applied to the output of the model.
+    HIDDEN_SIZE = 20
+
     model = nn.Sequential(OrderedDict([
-        ('fc0', nn.Linear(IMAGE_SIZE * IMAGE_SIZE, 10)),
+        ('fc0', nn.Linear(IMAGE_SIZE * IMAGE_SIZE, HIDDEN_SIZE)),
+        ('relu0', nn.ReLU()),
+        ('fc1', nn.Linear(HIDDEN_SIZE, 10)),
     ])).to(device)
     return model
 
@@ -162,8 +166,8 @@ def main(retrain, use_gpu_if_available):
     show_random_prediction(model, test_loader, device, hp_nn)
     show_random_prediction(quantized_torch_model, test_loader, device, hp_nn)
 
-    # cg = hp.code_generator.CodeGenerator('mnist-single_layer', hp_nn)
-    # print(cg.generate_code())
+    cg = hp.code_generator.CodeGenerator('mnist-multi_layer', hp_nn)
+    print(cg.generate_code(append_final_softmax=True))
 
     # print(model[0].weight.data.cpu().detach().numpy())
     # print(quantized_torch_model[0].weight.data.cpu().detach().numpy())
