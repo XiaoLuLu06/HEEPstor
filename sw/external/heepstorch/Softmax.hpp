@@ -8,7 +8,7 @@
 class Softmax {
 public:
     // Performs in-place softmax across every row of the matrix
-    void forward(Matrix<float>& m) {
+    static void forward(Matrix<float>& m) {
         const size_t rows = m.num_rows();
         const size_t cols = m.num_cols();
         float* data = m.get_data();

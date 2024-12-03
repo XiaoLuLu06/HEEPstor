@@ -49,8 +49,14 @@ public:
         HEEPSTOR_ASSERT(static_data != nullptr && "Static data pointer cannot be null");
     }
 
-    // Prevent copying
-    Matrix(const Matrix&) = delete;
+    // Factory method for creating const matrices from const data
+    static const Matrix from_const_pointer(const T* static_data, size_t r, size_t c) { return Matrix(const_cast<T*>(static_data), r, c); }
+
+    // Prevent copying, but allow copy initialization
+
+    // TODO: This function shouldn't really exist, but we need it to be able to initialize a const Matrix from from_const_pointer.
+    //  In the future, find a better way to express matrix constness.
+    Matrix(const Matrix&) = default;
     Matrix& operator=(const Matrix&) = delete;
 
     // Allow moving

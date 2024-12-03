@@ -9,7 +9,7 @@ import copy
 from heepstorch import quantization
 
 
-class HeepstorchModule(ABC):
+class Module(ABC):
     @abstractmethod
     def forward_quantized(self, x: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
         """
@@ -27,14 +27,14 @@ class HeepstorchModule(ABC):
         pass
 
     @staticmethod
-    def from_torch_module(m: torch.nn.Module) -> 'HeepstorchModule':
-        """Convert a PyTorch module to a HeepstorchModule.
+    def from_torch_module(m: torch.nn.Module) -> 'Module':
+        """Convert a PyTorch module to a Module.
 
         Args:
             m: PyTorch module to convert
 
         Returns:
-            HeepstorchModule: Converted module
+            Module: Converted module
 
         Raises:
             ValueError: If the module type is not supported
@@ -51,7 +51,7 @@ class HeepstorchModule(ABC):
             raise ValueError(f"Unsupported module type in Heepstorch: {type(m)}")
 
 
-class Linear(HeepstorchModule):
+class Linear(Module):
     """
     Linear layer of dimensions [DIM_IN, DIM_OUT]. DIM_IN is the dimensionality of the input and DIM_OUT
     is the dimensionality of the output.
@@ -87,12 +87,12 @@ class Linear(HeepstorchModule):
         return self.quantized_torch_module
 
 
-class HeepstorchSequentialNetwork:
-    def __init__(self, modules: OrderedDict[str, HeepstorchModule]):
+class SequentialNetwork:
+    def __init__(self, modules: OrderedDict[str, Module]):
         self.modules = modules
 
     @staticmethod
-    def from_torch_sequential(seq: torch.nn.Sequential) -> 'HeepstorchSequentialNetwork':
+    def from_torch_sequential(seq: torch.nn.Sequential) -> 'SequentialNetwork':
         def sanitize_name(name: str) -> str:
             # 0. If empty, return something
             if name == '':
@@ -115,8 +115,8 @@ class HeepstorchSequentialNetwork:
         assert len(sanitized_names) == len(
             set(sanitized_names)), f'After sanitizing, nn.Sequential are not unique! (After sanitization: {sanitized_names})'
 
-        return HeepstorchSequentialNetwork(OrderedDict(
-            [(sanitize_name(name), HeepstorchModule.from_torch_module(m)) for (name, m) in seq._modules.items()])
+        return SequentialNetwork(OrderedDict(
+            [(sanitize_name(name), Module.from_torch_module(m)) for (name, m) in seq._modules.items()])
         )
 
     def get_quantized_torch_module(self):

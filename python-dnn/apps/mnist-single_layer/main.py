@@ -7,8 +7,7 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import os
 import random
-from heepstorch.module import HeepstorchModule, HeepstorchSequentialNetwork
-import heepstorch
+import heepstorch as hp
 
 
 def get_model(device):
@@ -76,7 +75,7 @@ def test(model, test_loader, criterion, device, description=""):
 
 
 def show_random_prediction(model, test_loader, device,
-                           heepstorch_seq_baseline: HeepstorchSequentialNetwork | None = None):
+                           heepstorch_seq_baseline: hp.module.SequentialNetwork | None = None):
     data_iter = iter(test_loader)
     images, labels = next(data_iter)
 
@@ -151,7 +150,7 @@ def main(retrain, use_gpu_if_available):
 
     test(model, test_loader, criterion, device, "final")
 
-    hp_nn = HeepstorchSequentialNetwork.from_torch_sequential(model)
+    hp_nn = hp.module.SequentialNetwork.from_torch_sequential(model)
     quantized_torch_model = hp_nn.get_quantized_torch_module()
 
     test(quantized_torch_model, test_loader, criterion, device, "quantized")

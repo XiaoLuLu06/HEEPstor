@@ -40,6 +40,11 @@ public:
         HEEPSTOR_ASSERT(r > 0 && c > 0 && "Matrix dimensions must be positive");
     }
 
+    // Factory method for creating const matrices from const data
+    static const PackedInt8Matrix from_const_pointer(const uint32_t* data, size_t r, size_t c) {
+        return PackedInt8Matrix(const_cast<uint32_t*>(data), r, c);
+    }
+
     // Get a specific uint32_t containing 4 packed values. The index is in uint32_t units (i.e., goes over 4 int8_t).
     uint32_t get_packed_uint32(size_t packed_idx) const {
         const size_t required_uint32 = required_storage(rows, cols);
