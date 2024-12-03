@@ -7,6 +7,7 @@
 #include "model_parameters.hpp"
 
 class Model {
+public:
     static constexpr size_t NUM_INPUT_FEATURES = 144;
     static constexpr size_t NUM_OUTPUT_FEATURES = 10;
 

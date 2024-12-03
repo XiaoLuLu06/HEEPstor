@@ -6,7 +6,6 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import os
-import random
 import heepstorch as hp
 
 IMAGE_SIZE = 12
@@ -77,47 +76,6 @@ def test(model, test_loader, criterion, device, description=""):
     return accuracy
 
 
-def show_random_prediction(model, test_loader, device,
-                           heepstorch_seq_baseline: hp.module.SequentialNetwork | None = None):
-    data_iter = iter(test_loader)
-    images, labels = next(data_iter)
-
-    idx = random.randint(0, len(images) - 1)
-    image = images[idx].view(1, IMAGE_SIZE, IMAGE_SIZE)  # Reshape for display
-    label = labels[idx]
-
-    model.eval()
-    with torch.no_grad():
-        output = model(images[idx:idx + 1].to(device))
-        probs = torch.softmax(output, dim=1)
-        pred = probs.argmax(dim=1)
-        probs = probs.squeeze().cpu().numpy()
-        output = output.squeeze().cpu().numpy()
-
-    plt.imshow(image.squeeze(), cmap='gray')
-    plt.title(f'True: {label.item()}, Predicted: {pred.item()}\n'
-              f'Probability: {probs[pred.item()]:.2f}')
-    plt.show()
-
-    print(f'Predicted: {pred.item()} (with prob {probs[pred.item()]:.2f}). True: {label.item()}')
-    print(f'Raw output:')
-    print(output)
-
-    if heepstorch_seq_baseline is not None:
-        hp_output = heepstorch_seq_baseline(images[idx:idx + 1].numpy())
-        print('Heepstorch raw output:')
-        print(hp_output)
-        print('Output difference:')
-        print(hp_output - output)
-
-    print(f'Probs:')
-    print(probs)
-
-    print("\nClass probabilities:")
-    for i, prob in enumerate(probs):
-        print(f"Class {i}: {prob:.4f}")
-
-
 def train_model(model, train_loader, test_loader, criterion, device,
                 num_epochs=5, lr=0.01, checkpoint_path='mnist_model.pth'):
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
@@ -144,6 +102,44 @@ def load_or_train_model(train_loader, test_loader, criterion, device,
                        checkpoint_path=checkpoint_path)
 
 
+def get_test_predictions(model, test_loader, device, n_samples: int):
+    """
+    Gets first n_samples from test set and computes predictions and matrices
+    """
+    # Get first n_samples from loader
+    data_iter = iter(test_loader)
+    images, labels = next(data_iter)
+    images = images[:n_samples]
+    labels = labels[:n_samples]
+
+    model.eval()
+    with torch.no_grad():
+        output = model(images.to(device))
+        probs = torch.softmax(output, dim=1)
+        predictions = probs.argmax(dim=1)
+
+    # Create visualization
+    fig, axes = plt.subplots(1, n_samples, figsize=(3 * n_samples, 3))
+    if n_samples == 1:
+        axes = [axes]
+
+    for i, ax in enumerate(axes):
+        ax.imshow(images[i].view(IMAGE_SIZE, IMAGE_SIZE), cmap='gray')
+        ax.set_title(
+            f'True: {labels[i].item()}\nPred: {predictions[i].item()} (prob {probs[i, predictions[i]].item() * 100:.2f}%)')
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+    # Return matrices and predictions for example_main
+    return {
+        'input_matrix': images.numpy(),
+        'expected_output_prob_matrix': probs.cpu().numpy(),
+        'expected_predictions': predictions.cpu().numpy().tolist(),
+        'true_label_values': labels.numpy().tolist()
+    }
+
+
 def main(retrain, use_gpu_if_available):
     device = torch.device('cuda' if use_gpu_if_available and torch.cuda.is_available() else 'cpu')
     train_loader, test_loader = get_loaders()
@@ -151,24 +147,20 @@ def main(retrain, use_gpu_if_available):
 
     model = load_or_train_model(train_loader, test_loader, criterion, device, retrain)
 
-    test(model, test_loader, criterion, device, "final")
-
     hp_nn = hp.module.SequentialNetwork.from_torch_sequential(model)
     quantized_torch_model = hp_nn.get_quantized_torch_module()
 
     test(quantized_torch_model, test_loader, criterion, device, "quantized")
     test(model, test_loader, criterion, device, "non-quantized")
 
-    show_random_prediction(model, test_loader, device, hp_nn)
-    show_random_prediction(quantized_torch_model, test_loader, device, hp_nn)
+    pred_res = get_test_predictions(quantized_torch_model, test_loader, device, 5)
+    # pprint.pprint(pred_res)
 
     cg = hp.code_generator.CodeGenerator('mnist-single_layer', hp_nn)
     cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
-
-    # print(model[0].weight.data.cpu().detach().numpy())
-    # print(quantized_torch_model[0].weight.data.cpu().detach().numpy())
-    #
-    # print(hp_nn)
+    cg.generate_example_main('main.cpp', pred_res['input_matrix'], pred_res['expected_output_prob_matrix'],
+                             pred_res['expected_predictions'], pred_res['true_label_values'],
+                             overwrite_existing_generated_files=True)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,3 @@
-// TODO: Create driver
-
 #include "systolic_array.h"
 #include <algorithm>
 #include <cstdio>

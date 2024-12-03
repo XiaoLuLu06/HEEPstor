@@ -38,7 +38,7 @@ class CodeGenerator:
         def gen_mod_constexpr_definitions_and_wrapper(name: str, mod: 'hp.module.Module') -> (str, str):
             layer_name_and_type = f'{name}: {type(mod).__name__}'
 
-            raw_constexpr_defs, raw_wrapper = mod.generate_model_parameters_c_code_constexpr_definitions()
+            raw_constexpr_defs, raw_wrapper, raw_declarations = mod.generate_model_parameters_c_code_constexpr_definitions()
 
             # 1. Generate constexpr definitions
 
@@ -58,12 +58,19 @@ class CodeGenerator:
                 wrapper_header = f'// {layer_name_and_type}\n'
                 wrapper = wrapper_header + raw_wrapper
 
-            return constexpr_definitions, wrapper
+            # 3. Generate declarations
+            if raw_declarations is None:
+                declarations = None
+            else:
+                declarations_wrapper = f'// {layer_name_and_type}\n'
+                declarations = declarations_wrapper + raw_declarations
 
-        model_parameter_constexpr_definitions, wrapper = ['\n\n'.join([e for e in x if e is not None]) for x in
-                                                          zip(*[gen_mod_constexpr_definitions_and_wrapper(n, m) for n, m
-                                                                in
-                                                                self.sequential_network.modules.items()])]
+            return constexpr_definitions, wrapper, declarations
+
+        model_parameter_constexpr_definitions, wrapper, declarations = \
+            ['\n\n'.join([e for e in x if e is not None]) for x in zip(*[gen_mod_constexpr_definitions_and_wrapper(n, m)
+                                                                         for n, m in
+                                                                         self.sequential_network.modules.items()])]
 
         buffer_declarations, inference_steps, num_input_features, num_output_features = self.generate_inference_function(
             append_final_softmax)
@@ -71,10 +78,12 @@ class CodeGenerator:
         # Read template files
         model_hpp = (CODEGEN_TEMPLATE_DIR / 'model.hpp.tpl').read_text()
         model_parameters_hpp = (CODEGEN_TEMPLATE_DIR / 'model_parameters.hpp.tpl').read_text()
+        model_parameters_cpp = (CODEGEN_TEMPLATE_DIR / 'model_parameters.cpp.tpl').read_text()
 
         # Create template substitutions
         model_hpp_template = Template(model_hpp)
         model_parameters_hpp_template = Template(model_parameters_hpp)
+        model_parameters_cpp_template = Template(model_parameters_cpp)
 
         # Substitute values in templates
         model_hpp_indent_space_num = 8
@@ -92,6 +101,10 @@ class CodeGenerator:
         model_parameters_hpp_content = model_parameters_hpp_template.substitute(
             MODEL_PARAMETER_CONSTEXPR_DEFINITIONS=self.indent_lines(model_parameter_constexpr_definitions,
                                                                     model_parameters_hpp_indent_space_num)
+        )
+
+        model_parameters_cpp_content = model_parameters_cpp_template.substitute(
+            MODEL_PARAMETERS_DECLARATION=declarations
         )
 
         # Write templated files.
@@ -118,6 +131,54 @@ class CodeGenerator:
         # Write files
         (gen_dir / 'model.hpp').write_text(model_hpp_content)
         (gen_dir / 'model_parameters.hpp').write_text(model_parameters_hpp_content)
+        (gen_dir / 'model_parameters.cpp').write_text(model_parameters_cpp_content)
+
+    def generate_example_main(
+            self,
+            filename: str,
+            input_matrix: npt.NDArray[np.float32],
+            expected_output_matrix: npt.NDArray[np.float32],
+            expected_predictions: list[int],
+            true_label_values: list[int],
+            overwrite_existing_generated_files: bool
+    ):
+        """
+        Generates example main.cpp with test matrices and predictions
+        """
+
+        project_dir = HEEPSTOR_C_APPS_DIR / self.project_name
+
+        if not project_dir.exists():
+            raise ValueError(
+                f"Project {project_dir} does not exist, please generate code before generating the example main.")
+
+        dest_file = project_dir / filename
+
+        if dest_file.exists():
+            if overwrite_existing_generated_files:
+                print(f'Overwriting existing example main in {dest_file}')
+            else:
+                raise ValueError(f"File {dest_file} exists and overwrite_existing_generated_files=False")
+
+        def matrix_to_c_initializer(matrix: npt.NDArray[np.float32]) -> str:
+            rows, cols = matrix.shape
+            row_strs = []
+            indent = ' ' * 8
+            for i in range(rows):
+                elements = [f"{x:.9g}f" for x in matrix[i]]
+                row_strs.append(indent + "{" + ", ".join(elements) + "}")
+            return "{\n" + ",\n".join(row_strs) + "\n    }"
+
+        template = Template((CODEGEN_TEMPLATE_DIR / 'example_main.cpp.tpl').read_text())
+
+        content = template.substitute(
+            INPUT_MATRIX=matrix_to_c_initializer(input_matrix),
+            EXPECTED_OUTPUT_MATRIX=matrix_to_c_initializer(expected_output_matrix),
+            EXPECTED_PREDICTIONS=str(expected_predictions),
+            TRUE_LABEL_VALUES=str(true_label_values)
+        )
+
+        dest_file.write_text(content)
 
     def generate_buffers(self) -> [Buffer]:
         """

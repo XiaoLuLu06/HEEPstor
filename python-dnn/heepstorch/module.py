@@ -30,14 +30,13 @@ class Module(ABC):
         pass
 
     @abstractmethod
-    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str):
+    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
         """
-        Returns two strings representing all necessary C code constexpr model parameters definitions (such as weights,
-        quantization scaling, bias) for Heepstor execution. module_name is the name of the module that should be used
-        to prepend the model variable names.
+        Returns three strings representing all necessary C code constexpr model parameters definitions (such as weights,
+        quantization scaling, bias) for Heepstor execution.
         The first string of the tuple are the constexpr array declarations to be stored in the ModelParameters class,
         containing the actual value of the weights. The second string of the tuple are the wrappers of the arrays into
-        Heepstor Matrix classes.
+        Heepstor Matrix classes. The third string are the constexpr array definitions, without the declaration.
         """
         pass
 
@@ -171,11 +170,12 @@ class Linear(Module):
     def bias_data_varname(self) -> str:
         return f'{self.name}_bias_data'
 
-    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str):
+    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
         assert self.weights_quantized.shape == (self.DIM_IN, self.DIM_OUT)
 
-        c_code_weight_data, _ = CodeGenerator.quantized_weights_to_packed_c_array(self.weights_quantized,
-                                                                                  self.weight_data_varname())
+        c_code_weight_data, weight_arr_size = CodeGenerator.quantized_weights_to_packed_c_array(self.weights_quantized,
+                                                                                                self.weight_data_varname())
+
         c_code_weight_scale = f'static constexpr float {self.weight_scale_varname()} = {self.weight_scale:.9g};'
         c_code_bias_data, bias_arr_size = CodeGenerator.bias_to_c_array(self.bias, self.bias_data_varname())
 
@@ -185,7 +185,13 @@ class Linear(Module):
         c_code_wrapper_bias = f'const Matrix<float> {self.bias_matrix_varname()} = Matrix<float>::from_const_pointer(ModelParameters::{self.bias_data_varname()}, 1, {bias_arr_size});'
 
         wrapper = '\n'.join([c_code_wrapper_weights, c_code_wrapper_bias])
-        return model_parameter_definitions, wrapper
+
+        weight_data_declaration = f'constexpr uint32_t ModelParameters::{self.weight_data_varname()}[{weight_arr_size}];'
+        bias_data_declaration = f'constexpr float ModelParameters::{self.bias_data_varname()}[{bias_arr_size}];'
+
+        declarations = '\n'.join([weight_data_declaration, bias_data_declaration])
+
+        return model_parameter_definitions, wrapper, declarations
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
         return f'Linear::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name});'
@@ -221,7 +227,7 @@ class ReLU(Module):
         return self.quantized_torch_module
 
     def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str):
-        return None, None
+        return None, None, None
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
         assert input_buffer_name == output_buffer_name
