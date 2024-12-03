@@ -5,4 +5,5 @@
 
 #include "Argmax.hpp"
 #include "Linear.hpp"
+#include "ReLu.hpp"
 #include "Softmax.hpp"

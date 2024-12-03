@@ -3,6 +3,7 @@
 #include <math/matrix.h>
 
 class ReLU {
+public:
     static void forward(Matrix<float>& m) {
         float* data = m.get_data();
 

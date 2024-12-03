@@ -4,9 +4,12 @@ import heepstorch as hp
 import numpy as np
 import numpy.typing as npt
 import os
+from pathlib import Path
 from string import Template
 
-SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
+CODEGEN_TEMPLATE_DIR = SCRIPT_DIR / 'templates' / 'codegen'
+HEEPSTOR_C_APPS_DIR = SCRIPT_DIR.parent.parent / 'sw' / 'applications'
 
 
 @dataclass
@@ -21,7 +24,17 @@ class CodeGenerator:
         self.project_name = project_name
         self.sequential_network = sequential_network
 
-    def generate_code(self, append_final_softmax) -> str:
+    @staticmethod
+    def indent_lines(text: str, spaces: int = 4) -> str:
+        """Indents all lines of input text by specified number of spaces"""
+        indent = ' ' * spaces
+        return '\n'.join(indent + line if line else line for line in text.splitlines())
+
+    def generate_code(self, append_final_softmax, overwrite_existing_generated_files=False):
+        """
+        Generates all necessary C code for inference in Heepstor, and writes it to the provided project.
+        """
+
         def gen_mod_constexpr_definitions_and_wrapper(name: str, mod: 'hp.module.Module') -> (str, str):
             layer_name_and_type = f'{name}: {type(mod).__name__}'
 
@@ -52,8 +65,59 @@ class CodeGenerator:
                                                                 in
                                                                 self.sequential_network.modules.items()])]
 
-        buffer_declarations, inference_steps = self.generate_inference_function(append_final_softmax)
-        return model_parameter_constexpr_definitions + '\n\n' + wrapper + '\n\n' + buffer_declarations + '\n\n' + inference_steps
+        buffer_declarations, inference_steps, num_input_features, num_output_features = self.generate_inference_function(
+            append_final_softmax)
+
+        # Read template files
+        model_hpp = (CODEGEN_TEMPLATE_DIR / 'model.hpp.tpl').read_text()
+        model_parameters_hpp = (CODEGEN_TEMPLATE_DIR / 'model_parameters.hpp.tpl').read_text()
+
+        # Create template substitutions
+        model_hpp_template = Template(model_hpp)
+        model_parameters_hpp_template = Template(model_parameters_hpp)
+
+        # Substitute values in templates
+        model_hpp_indent_space_num = 8
+
+        model_hpp_content = model_hpp_template.substitute(
+            NUM_INPUT_FEATURES=num_input_features,
+            NUM_OUTPUT_FEATURES=num_output_features,
+            MODEL_PARAMETER_WRAPPERS=self.indent_lines(wrapper, model_hpp_indent_space_num),
+            INTERMEDIATE_BUFFER_DECLARATIONS=self.indent_lines(buffer_declarations, model_hpp_indent_space_num),
+            INFERENCE_STEPS=self.indent_lines(inference_steps, model_hpp_indent_space_num)
+        )
+
+        model_parameters_hpp_indent_space_num = 4
+
+        model_parameters_hpp_content = model_parameters_hpp_template.substitute(
+            MODEL_PARAMETER_CONSTEXPR_DEFINITIONS=self.indent_lines(model_parameter_constexpr_definitions,
+                                                                    model_parameters_hpp_indent_space_num)
+        )
+
+        # Write templated files.
+
+        project_dir = HEEPSTOR_C_APPS_DIR / self.project_name
+        gen_dir = project_dir / 'gen'
+
+        if project_dir.exists():
+            if gen_dir.exists():
+                if overwrite_existing_generated_files:
+                    print(f'Overwriting existing generated files in {project_dir}...')
+                else:
+                    raise ValueError(
+                        f'Project {project_dir} already exists and overwrite_existing_generated_files=False, aborting...')
+            else:
+                raise ValueError(
+                    f"Project {project_dir} exists but has no gen directory. Aborting, as something seems wrong.")
+
+        # Create directories if needed
+        if not project_dir.exists():
+            project_dir.mkdir()
+            gen_dir.mkdir()
+
+        # Write files
+        (gen_dir / 'model.hpp').write_text(model_hpp_content)
+        (gen_dir / 'model_parameters.hpp').write_text(model_parameters_hpp_content)
 
     def generate_buffers(self) -> [Buffer]:
         """
@@ -132,9 +196,11 @@ class CodeGenerator:
 
         return buffers
 
-    def generate_inference_function(self, append_final_softmax) -> (str, str):
+    def generate_inference_function(self, append_final_softmax) -> (str, str, int, int):
         """
-        Returns two strings. The first is the code for instantiating temporal matrices to be used during the
+        Returns two strings and two integers. The first string is the code for instantiating intermediate buffers to be used
+        during the inference, and the second string is the code for performing the inference. The first integer is the
+        number of input features and the second integer is the number of output features.
         """
 
         # 1. Intermediate storage
@@ -144,7 +210,7 @@ class CodeGenerator:
         # Skip input and output declarations, which are arguments to the function.
         for buffer in buffers[1:-1]:
             # TODO: When implementing Conv2d layers, this will have to be changed.
-            buffer_declarations.append(f'const Matrix<float> {buffer.name}(BATCH_SIZE, {buffer.num_features});')
+            buffer_declarations.append(f'Matrix<float> {buffer.name}(BATCH_SIZE, {buffer.num_features});')
 
         buffer_declaration_c_code = '\n'.join(buffer_declarations)
 
@@ -171,11 +237,11 @@ class CodeGenerator:
 
         if append_final_softmax:
             inference_steps.append(f'// {last_idx + 2}. Final Softmax')
-            inference_steps.append(f'Softmax::forward({buffers[-1].name})')
+            inference_steps.append(f'Softmax::forward({buffers[-1].name});')
 
         inference_steps_c_code = '\n'.join(inference_steps)
 
-        return buffer_declaration_c_code, inference_steps_c_code
+        return buffer_declaration_c_code, inference_steps_c_code, buffers[0].num_features, buffers[-1].num_features
 
     @staticmethod
     def quantized_weights_to_packed_c_array(x: npt.NDArray[np.int8], identifier_name: str) -> (str, int):

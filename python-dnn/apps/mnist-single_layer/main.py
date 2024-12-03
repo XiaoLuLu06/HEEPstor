@@ -162,8 +162,8 @@ def main(retrain, use_gpu_if_available):
     show_random_prediction(model, test_loader, device, hp_nn)
     show_random_prediction(quantized_torch_model, test_loader, device, hp_nn)
 
-    # cg = hp.code_generator.CodeGenerator('mnist-single_layer', hp_nn)
-    # print(cg.generate_code())
+    cg = hp.code_generator.CodeGenerator('mnist-single_layer', hp_nn)
+    cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
 
     # print(model[0].weight.data.cpu().detach().numpy())
     # print(quantized_torch_model[0].weight.data.cpu().detach().numpy())
