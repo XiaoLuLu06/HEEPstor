@@ -23,8 +23,8 @@ class CodeGenerationTests(unittest.TestCase):
         def test(mu, sigma, name):
             bias = sigma * np.random.randn(13) + mu
             bias_c_array, size = cg.CodeGenerator.bias_to_c_array(bias, name)
-            print(f'\n{name}: {bias}')
             print(bias_c_array)
+            print(f'\n{name}: {bias}')
             print(f'Size: {size}')
 
         test(0, 1, 'normal')

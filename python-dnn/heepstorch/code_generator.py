@@ -1,12 +1,57 @@
 import heepstorch as hp
 import numpy as np
 import numpy.typing as npt
+import os
+from string import Template
+
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 class CodeGenerator:
-    def __init__(self, project_name: str, sequential_network: hp.module.SequentialNetwork):
+    def __init__(self, project_name: str, sequential_network: 'hp.module.SequentialNetwork'):
         self.project_name = project_name
         self.sequential_network = sequential_network
+
+    def generate_code(self, append_final_softmax) -> str:
+        def gen_mod_constexpr_definitions_and_wrapper(name: str, mod: 'hp.module.Module') -> (str, str):
+            layer_name_and_type = f'{name}: {type(mod).__name__}'
+
+            raw_constexpr_defs, raw_wrapper = mod.generate_model_parameters_c_code_constexpr_definitions()
+
+            # 1. Generate constexpr definitions
+
+            constexpr_def_header = '//' + '/' * 20 + '\n'
+            constexpr_def_header += f'//   {layer_name_and_type}\n'
+            constexpr_def_header += '//' + '/' * 20 + '\n' * 2
+            constexpr_definitions = constexpr_def_header + raw_constexpr_defs
+
+            # 2. Generate wrappers
+
+            wrapper_header = f'// {layer_name_and_type}\n'
+            wrapper = wrapper_header + raw_wrapper
+
+            return constexpr_definitions, wrapper
+
+        model_parameter_constexpr_definitions, wrapper = ['\n\n'.join(x) for x in
+                                                          zip(*[gen_mod_constexpr_definitions_and_wrapper(n, m) for n, m
+                                                                in
+                                                                self.sequential_network.modules.items()])]
+
+        return model_parameter_constexpr_definitions + '\n\n' + wrapper
+
+    def generate_inference_function(self, append_final_softmax) -> (str, str):
+        """
+        Returns two strings. The first is the code for instantiating temporal matrices to be used during the
+        """
+
+        # 1. Intermediate storage
+
+        # TODO: In the future, do a smarter allocation strategy. For example, use two arenas from which we instantiate
+        #  matrices and ping-pong them, and clean the unused arena after each stage. For now, we will keep it simple.
+
+        # 2. Inference steps.
+
+        assert append_final_softmax == False
 
     @staticmethod
     def quantized_weights_to_packed_c_array(x: npt.NDArray[np.int8], identifier_name: str) -> (str, int):
@@ -48,7 +93,7 @@ class CodeGenerator:
 
         array_size = len(packed_uint32_array)
 
-        c_code = f"constexpr uint32_t {identifier_name}[{array_size}] = {{\n    "
+        c_code = f"static constexpr uint32_t {identifier_name}[{array_size}] = {{\n    "
         hex_values = [f"0x{val:08X}" for val in packed_uint32_array]
         rows_of_values = [hex_values[i:i + num_padded_cols // 4] for i in
                           range(0, len(hex_values), num_padded_cols // 4)]
@@ -68,7 +113,7 @@ class CodeGenerator:
 
         array_size = len(x)
 
-        c_code = f"constexpr float {identifier_name}[{array_size}] = {{\n    "
+        c_code = f"static constexpr float {identifier_name}[{array_size}] = {{\n    "
 
         # Use %.9g to maintain precision while avoiding unnecessary decimal places
         float_values = [f"{val:.9g}f" for val in x]
