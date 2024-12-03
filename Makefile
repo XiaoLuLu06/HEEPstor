@@ -17,7 +17,7 @@ CPU ?= cv32e40p
 # TODO: See what EXTERNAL_DOMAINS is, and how to adapt it to our usecase.
 # 1 external domain for the CGRA
 EXTERNAL_DOMAINS = 1
-PROJECT ?= hello_world
+PROJECT ?= test_playground
 
 # TODO: Play with number of MEMORY_BANKS in the future
 
