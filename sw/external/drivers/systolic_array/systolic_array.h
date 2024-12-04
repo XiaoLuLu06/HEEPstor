@@ -30,16 +30,16 @@ public:
     //      weights_reg[0][1] <= weight_input[23:16];
     //      weights_reg[0][2] <= weight_input[15:8];
     //      weights_reg[0][3] <= weight_input[7:0];
-    void write_weights(uint32_t four_packed_weights);
+    __attribute__((always_inline)) void write_weights(uint32_t four_packed_weights);
 
     // Load activation into the input shift registers at position IDX, but do not perform any computation yet (not all inputs are loaded)
     // Returns the activation at position IDX of output shift register.
-    float stream(uint32_t idx, float activation);
+    __attribute__((always_inline)) float stream(uint32_t idx, float activation);
 
     // Load activation into the input shift registers at position IDX, and perform a computation in the systolic array (shifting all the values).
     // activation is therefore the last activation (IDX should be SYSTOLIC_ARRAY_SIZE-1 if loading activations starting from 0).
     // Returns the activation at position IDX of output shift register.
-    float queue(uint32_t idx, float activation);
+    __attribute__((always_inline)) float queue(uint32_t idx, float activation);
 
     // Multiplies two matrices lhs (size MxN) and rhs (size NxP) using the systolic array. The sizes are
     //  expressed as number of elements, but the weight matrix (rhs) must have already been compressed into 32-bit words.

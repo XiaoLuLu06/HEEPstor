@@ -1,6 +1,7 @@
 #pragma once
 
 #include <drivers/systolic_array/systolic_array.h>
+#include <heepstor_defs.h>
 #include <math/matrix.h>
 #include <math/packed_int8_matrix.h>
 
@@ -13,7 +14,12 @@ public:
                         activations.num_cols() == quantized_weights.num_rows());
 
         // 1. Perform the matrix multiplication
+
+#if USE_SOFTWARE_DNN_LAYER_OPERATORS
+        activations.multiply_software_with_packed(quantized_weights, out);
+#else
         systolic_array.matrix_matrix_multiply(activations, quantized_weights, out);
+#endif
 
         // 2. Apply the post-quantization scaling
         out *= quantized_weight_scale;

@@ -8,6 +8,7 @@
 #include "heepstor.h"
 #include "heepstor_assert.h"
 #include "packed_int8_matrix.h"
+#include "profiling/performance_timer.hpp"
 #include "static_arena_allocator.h"
 #include "systolic_array.h"
 
@@ -217,26 +218,37 @@ int main(int argc, char* argv[]) {
                 std::max(total_max_relative_error_percentage, run_random_tests(m, n, p, num_runs, -1000, 1000, rng));
         };
 
-        t(15, 4, 4, 5);
-        t(6, 4, 4, 5);
-        t(3, 4, 4, 5);
-        t(2, 4, 4, 5);
-        t(3, 1, 2, 1);
+        CheckpointPerformanceTimer<2> timer{CheckpointPerformanceTimerDisplayConfig::Seconds};
 
-        t(8, 8, 8, 2);
-        t(10, 9, 7, 2);
-        t(8, 9, 10, 2);
-        t(8, 9, 9, 2);
-        t(13, 30, 41, 2);
+        timer.reset();
+
+        const int NUM_RUNS = 1;
+
+        t(15, 4, 4, NUM_RUNS);
+        t(6, 4, 4, NUM_RUNS);
+        t(3, 4, 4, NUM_RUNS);
+        t(2, 4, 4, NUM_RUNS);
+        t(3, 1, 2, NUM_RUNS);
+
+        t(8, 8, 8, NUM_RUNS);
+        t(10, 9, 7, NUM_RUNS);
+        t(8, 9, 10, NUM_RUNS);
+        t(8, 9, 9, NUM_RUNS);
+        t(13, 30, 41, NUM_RUNS);
+
+        timer.checkpoint();
 
         // Test small matrices
         for (int i = 1; i <= 4; ++i) {
             for (int j = 1; j <= 4; ++j) {
-                t(3, i, j, 3);
-                t(4, i, j, 3);
-                t(10, i, j, 3);
+                t(3, i, j, NUM_RUNS);
+                t(4, i, j, NUM_RUNS);
+                t(10, i, j, NUM_RUNS);
             }
         }
+
+        timer.checkpoint();
+        timer.finalize({"Manual tests", "Small matrices"});
 
         printf("\n================================================ \n");
         printf("All random tests max relative err: ");

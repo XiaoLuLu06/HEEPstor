@@ -75,6 +75,13 @@ class CodeGenerator:
         buffer_declarations, inference_steps, num_input_features, num_output_features = self.generate_inference_function(
             append_final_softmax)
 
+        num_layers = len(self.sequential_network.modules) + 1 if append_final_softmax else 0
+        perf_timer_layer_list = [f'{m.get_name()} ({type(m).__name__})' for m in
+                                 self.sequential_network.modules.values()]
+
+        if append_final_softmax:
+            perf_timer_layer_list.append('Final Softmax')
+
         # Read template files
         model_hpp = (CODEGEN_TEMPLATE_DIR / 'model.hpp.tpl').read_text()
         model_parameters_hpp = (CODEGEN_TEMPLATE_DIR / 'model_parameters.hpp.tpl').read_text()
@@ -93,7 +100,9 @@ class CodeGenerator:
             NUM_OUTPUT_FEATURES=num_output_features,
             MODEL_PARAMETER_WRAPPERS=self.indent_lines(wrapper, model_hpp_indent_space_num),
             INTERMEDIATE_BUFFER_DECLARATIONS=self.indent_lines(buffer_declarations, model_hpp_indent_space_num),
-            INFERENCE_STEPS=self.indent_lines(inference_steps, model_hpp_indent_space_num)
+            INFERENCE_STEPS=self.indent_lines(inference_steps, model_hpp_indent_space_num),
+            NUM_LAYERS=num_layers,
+            PERF_TIMER_LAYER_LIST=', '.join([f'"{x}"' for x in perf_timer_layer_list])
         )
 
         model_parameters_hpp_indent_space_num = 4
@@ -290,7 +299,8 @@ class CodeGenerator:
             input_buffer = buffers[buffer_idx]
             output_buffer = buffers[buffer_idx] if module.performs_inference_in_place() else buffers[buffer_idx + 1]
 
-            inference_steps.append(module.generate_inference_c_code(input_buffer.name, output_buffer.name) + '\n')
+            inference_steps.append(module.generate_inference_c_code(input_buffer.name, output_buffer.name))
+            inference_steps.append('performance_timer.checkpoint();\n')
 
             if not module.performs_inference_in_place():
                 buffer_idx += 1
@@ -300,6 +310,7 @@ class CodeGenerator:
         if append_final_softmax:
             inference_steps.append(f'// {last_idx + 2}. Final Softmax')
             inference_steps.append(f'Softmax::forward({buffers[-1].name});')
+            inference_steps.append('performance_timer.checkpoint();')
 
         inference_steps_c_code = '\n'.join(inference_steps)
 

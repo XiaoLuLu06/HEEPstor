@@ -12,12 +12,12 @@ SystolicArray SystolicArray::get_default() {
     return SystolicArray{mmio_region_from_addr(SYSTOLIC_ARRAY_START_ADDRESS)};
 }
 
-void SystolicArray::write_weights(uint32_t four_packed_weights) {
+__attribute__((always_inline)) void SystolicArray::write_weights(uint32_t four_packed_weights) {
     uint32_t cmd = static_cast<uint32_t>(Command::WRITE_WEIGHTS);
     write_32_bits(cmd << 18, four_packed_weights);
 }
 
-float SystolicArray::stream(uint32_t idx, float activation) {
+__attribute__((always_inline)) float SystolicArray::stream(uint32_t idx, float activation) {
     uint32_t cmd = static_cast<uint32_t>(Command::STREAM);
 
     uint32_t raw_activation_bits;
@@ -31,7 +31,7 @@ float SystolicArray::stream(uint32_t idx, float activation) {
     return res;
 }
 
-float SystolicArray::queue(uint32_t idx, float activation) {
+__attribute__((always_inline)) float SystolicArray::queue(uint32_t idx, float activation) {
     uint32_t cmd = static_cast<uint32_t>(Command::QUEUE);
 
     uint32_t raw_activation_bits;
@@ -120,7 +120,7 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
     uint32_t systolic_array_first_stream_with_valid_output = 2 * SYSTOLIC_ARRAY_SIZE;
     size_t num_streams_to_systolic_array = 0;
 
-    auto stream_or_queue_and_store_result_if_valid = [&](size_t& idx, float input_value) {
+    auto stream_or_queue_and_store_result_if_valid = [&](size_t & idx, float input_value) __attribute__((always_inline)) {
         // If the output is valid, store the result
         bool isOutputValid = num_streams_to_systolic_array >= systolic_array_first_stream_with_valid_output;
         float res;

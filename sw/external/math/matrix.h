@@ -135,7 +135,7 @@ public:
     }
 
     // Software matrix multiplication with uint8_t packed matrix
-    Matrix multiply_software_with_packed(const PackedInt8Matrix& rhs) {
+    Matrix multiply_software_with_packed(const PackedInt8Matrix& rhs) const {
         static_assert(std::is_same<T, float>::value, "PackedInt8Matrix multiplication only supported with float matrices");
         HEEPSTOR_ASSERT(cols == rhs.num_rows() && "Invalid dimensions for multiplication");
 
@@ -145,7 +145,7 @@ public:
         return result;
     }
 
-    void multiply_software_with_packed(const PackedInt8Matrix& rhs, Matrix& out) {
+    void multiply_software_with_packed(const PackedInt8Matrix& rhs, Matrix& out) const {
         static_assert(std::is_same<T, float>::value, "PackedInt8Matrix multiplication only supported with float matrices");
         HEEPSTOR_ASSERT(cols == rhs.num_rows() && "Invalid dimensions for multiplication");
 

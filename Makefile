@@ -7,6 +7,10 @@
 
 .PHONY: clean help
 
+# Heepstor oftware parameters. Feel free to change them.
+ENABLE_DEBUG_HEEPSTOR_ASSERTIONS ?= 1
+USE_SOFTWARE_DNN_LAYER_OPERATORS ?= 0
+
 # TARGET 		?= sim
 FPGA_BOARD 	?= zcu104
 PORT		?= /dev/ttyUSB2
@@ -113,6 +117,7 @@ run-fpga-com:
 .PHONY: app
 # Add a dependency on the existing app target of XHEEP to create a link to the build folder
 app: link_build
+	$(PYTHON) util/heepstor_defs.py --enable-debug $(ENABLE_DEBUG_HEEPSTOR_ASSERTIONS) --use-software-dnn $(USE_SOFTWARE_DNN_LAYER_OPERATORS) sw/external/heepstor_defs.h.tpl
 	$(MAKE) xheep_app PROJECT=$(PROJECT) LINKER=flash_load TARGET=$(FPGA_BOARD) ARCH=rv32imfc
 
 XHEEP_MAKE = $(HEEP_DIR)/external.mk
@@ -123,9 +128,7 @@ xheep_app:
 
 include $(XHEEP_MAKE)
 
-# TODO: This is not loading the correct ARCH!!
 app: link_build
-# TODO: Remove the below infinite loop! Find a way to change the parameters without modifying X-Heep makefile. 
 
 clean-app: link_rm
 

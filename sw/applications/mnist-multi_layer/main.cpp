@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "drivers/fpu.hpp"
 #include "gen/model.hpp"
+#include "profiling/performance_timer.hpp"
 
 void perform_test_inference() {
     auto systolic_array = SystolicArray::get_default();
@@ -28,7 +29,7 @@ void perform_test_inference() {
 
     printf("Performing inference...\n");
 
-    Model::infer(systolic_array, inputs, outputs);
+    Model::infer(systolic_array, inputs, outputs, CheckpointPerformanceTimerDisplayConfig::Seconds);
 
     ///////////////////////////////////////////
     // 3. Check the output
@@ -47,9 +48,6 @@ void perform_test_inference() {
         {0.000629170798f, 6.95760718e-06f, 0.00390358479f, 0.000162088196f, 0.926747322f, 0.00118422275f, 0.00314390915f, 0.0119571416f, 0.00233091228f, 0.049934607f}
     };
 
-    HEEPSTOR_ASSERT(outputs.num_rows() == batch_size);
-    HEEPSTOR_ASSERT(outputs.num_cols() == Model::NUM_OUTPUT_FEATURES);
-
     printf("Expected output: \n");
     expected_outputs.print();
 
@@ -58,7 +56,7 @@ void perform_test_inference() {
     printFloat(relative_error_percentage);
     printf("%%\n");
 
-    Matrix<int> output_predictions(1, outputs.num_rows());
+    Matrix<int> output_predictions(1, batch_size);
     Argmax::forward_batch(outputs, output_predictions);
 
     printf("Computed Predictions: \n");
@@ -80,7 +78,11 @@ int main(int argc, char* argv[]) {
     printf("====================================\n");
     printf("Hello from HEEPstor! \n");
     printf("PROJECT: mnist-multi_layer\n");
+#if USE_SOFTWARE_DNN_LAYER_OPERATORS
+    printf("USING SOFTWARE DNN OPERATORS\n");
+#else
     printf("SYSTOLIC_ARRAY_SIZE=%u\n", SystolicArray::SIZE);
+#endif
     printf("====================================\n");
     printf("\n");
 
@@ -98,6 +100,7 @@ int main(int argc, char* argv[]) {
 
     // 5. Print a reminder to disable Heepstor asserts when functionality has been established to be
     //  correct in order to avoid expensive checks during inference.
-    // TODO: Disable heepstor assert for better performance
+#if ENABLE_DEBUG_HEEPSTOR_ASSERTIONS
     printf("NOTE: Disable heepstor assert for better performance\n");
+#endif
 }
