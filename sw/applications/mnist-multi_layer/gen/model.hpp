@@ -1,3 +1,4 @@
+// DO NOT EDIT. File generated automatically, your changes will be lost when regenerated.
 #pragma once
 
 #include <drivers/systolic_array/systolic_array.h>

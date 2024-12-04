@@ -1,3 +1,4 @@
+// DO NOT EDIT. File generated automatically, your changes will be lost when regenerated.
 #include <stdio.h>
 #include "drivers/fpu.hpp"
 #include "gen/model.hpp"

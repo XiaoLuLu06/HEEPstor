@@ -19,6 +19,7 @@ build
 
 hw/rtl/heepstor_pkg.sv
 sw/external/drivers/systolic_array/systolic_array_def.h
+sw/external/heepstor_defs.h
 
 *.vscode*
 *vivado*

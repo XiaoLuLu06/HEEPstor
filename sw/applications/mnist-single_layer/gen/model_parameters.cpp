@@ -1,3 +1,4 @@
+// DO NOT EDIT. File generated automatically, your changes will be lost when regenerated.
 #include "model_parameters.hpp"
 
 // fc0: Linear
