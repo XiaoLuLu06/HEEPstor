@@ -188,7 +188,6 @@ void SystolicArray::matrix_matrix_multiply(const MatrixTile<float>& lhs, const P
 
     // Stream remaining values
     while (out_iterator != out.end()) {
-        bool should_stream = idx == SYSTOLIC_ARRAY_SIZE - 1;
         stream_or_queue_and_store_result_if_valid(idx, 0.0f);
     }
 }

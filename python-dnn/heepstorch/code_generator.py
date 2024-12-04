@@ -175,7 +175,8 @@ class CodeGenerator:
             INPUT_MATRIX=matrix_to_c_initializer(input_matrix),
             EXPECTED_OUTPUT_MATRIX=matrix_to_c_initializer(expected_output_matrix),
             EXPECTED_PREDICTIONS=str(expected_predictions),
-            TRUE_LABEL_VALUES=str(true_label_values)
+            TRUE_LABEL_VALUES=str(true_label_values),
+            PROJECT_NAME=self.project_name,
         )
 
         dest_file.write_text(content)

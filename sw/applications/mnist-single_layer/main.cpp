@@ -58,7 +58,7 @@ void perform_test_inference() {
     printFloat(relative_error_percentage);
     printf("%%\n");
 
-    Matrix<int> output_predictions(1, outputs.num_cols());
+    Matrix<int> output_predictions(1, outputs.num_rows());
     Argmax::forward_batch(outputs, output_predictions);
 
     printf("Computed Predictions: \n");
@@ -75,15 +75,21 @@ int main(int argc, char* argv[]) {
     // 1. Enable RISC-V CPU Floating Point Unit
     FloatingPointUnit::enable();
 
-    // 2. Print the systolic array size used by the system.
+    // 2. Print banner with project name  systolic array size used by the system.
+    printf("\n");
+    printf("====================================\n");
+    printf("Hello from HEEPstor! \n");
+    printf("PROJECT: mnist-single_layer\n");
     printf("SYSTOLIC_ARRAY_SIZE=%u\n", SystolicArray::SIZE);
+    printf("====================================\n");
+    printf("\n");
 
     // 3. Perform a test inference
     perform_test_inference();
 
     // 4. Print arena allocator (memory where non-static matrices are stored) usage information
     {
-        printf("\n ARENA ALLOCATOR: \n");
+        printf("\nARENA ALLOCATOR: \n");
         printf("Available bytes: %d, Used bytes: %d\n", StaticArenaAllocator::available_bytes(), StaticArenaAllocator::used_bytes());
 
         // NOTE: You may clear the arena allocator after inference to recover the used memory for other inferences.

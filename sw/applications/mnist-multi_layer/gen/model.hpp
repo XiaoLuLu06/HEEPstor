@@ -13,11 +13,11 @@ public:
 
     // inputs is a matrix of shape [BATCH_SIZE x NUM_INPUT_FEATURES], outputs is a matrix of shape [BATCH_SIZE x NUM_OUTPUT_FEATURES]
     static void infer(SystolicArray& systolic_array, const Matrix<float>& inputs, Matrix<float>& outputs) {
-        HEEPSTOR_ASSERT(inputs.num_rows() == NUM_INPUT_FEATURES);
-        HEEPSTOR_ASSERT(outputs.num_rows() == NUM_OUTPUT_FEATURES);
-        HEEPSTOR_ASSERT(inputs.num_cols() == outputs.num_cols());
+        HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_FEATURES);
+        HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
+        HEEPSTOR_ASSERT(inputs.num_rows() == outputs.num_rows());
 
-        const size_t BATCH_SIZE = inputs.num_cols();
+        const size_t BATCH_SIZE = inputs.num_rows();
 
         //////////////////////////////////////////////
         //  Wrap the model parameters into matrices.
