@@ -24,7 +24,7 @@ Currently, the following PyTorch layer modules are supported. The main module mu
 - `nn.Linear`: with weights (which are quantized) and bias
 - `nn.ReLU`
 
-Additionally, an optional `Softmax` is supported at the end of the model to generate a probability distribution.
+Additionally, an optional `Softmax` is supported at the end of the model to generate a probability distribution. This is achieved by passing an additional `append_final_softmax=True` argument to `heepstorch.code_generator.CodeGenerator.generate_code`. This way, the original model is not modified and criterions such as `torch.nn.CrossEntropyLoss` can still be used, without having to add a useless softmax layer to model training.
 
 In the future, our plan is to add support for more layers, such as `nn.Conv2d`.
 
@@ -49,14 +49,14 @@ In order to build the HW and SW C++ applications, do:
 In order to generate a C++ application from a PyTorch model, do:
 
 1. Write your Python application in `python-dnn/apps`. Take a look at some examples such as `mnist-single_layer` or `mnist-multi_layer`. The HEEPstor implementation with PyTorch is in the `heepstorch` package, stored in `python-dnn/heepstorch`.
-2. Install the prerrequisites into your Python installation. The prerrequisites can be found in `python-dnn/requirements.txt`.
+2. Install the prerequisites into your Python installation. The prerequisites can be found in `python-dnn/requirements.txt`.
 3. Run the Python application by adding `PYTHONPATH=/your/absolute/path/to/python-dnn/`: `PYTHONPATH=/your/absolute/path/to/python-dnn/ python3 python-dnn/apps/your-app/main.py`. Alternatively, you can open the folder `python-dnn` in an IDE such as PyCharm, which will then handle PYTHONPATH. Run each Python app inside their respective folders, as most of them will download some datasets (such as MNIST). We recommend using PyCharm, which automatically takes care of this.
 
 ## Options
 
 There are several options that can be tweaked if needed:
 
-- Memory size: You can change the number of X-Heep HW memory banks by tweaking `MEMORY_BANKS` in the `Makefile`. If you run out of space for intermediate buffers or the input / output matrices, which are stored in the `StaticArenaAllocator`, you can increase it's size by changing `StaticArenaAllocator::ARENA_SIZE` in `sw/external/memory/static_arena_allocator.h`.
+- Memory size: You can change the number of X-Heep HW memory banks by tweaking `MEMORY_BANKS` in the `Makefile`. If you run out of space for intermediate buffers or the input / output matrices, which are stored in the `StaticArenaAllocator`, you can increase its size by changing `StaticArenaAllocator::ARENA_SIZE` in `sw/external/memory/static_arena_allocator.h`.
 - Disable debug assertions: To speed-up operation, you can disable HEEPstor (which disables every `HEEPSTOR_ASSERT`) assertions by using `ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`: `make run-fpga-com PROJECT=your_project_name ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`.
 - Use software DNN layer operators instead of the systolic array: `make run-fpga-com PROJECT=your_project_name USE_SOFTWARE_DNN_LAYER_OPERATORS=1`.
 
