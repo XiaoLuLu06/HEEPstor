@@ -2,7 +2,7 @@
 
 HEEPstor is an acceleration platform targeting ultra-low-power tensor computation built over the [X-HEEP](https://github.com/esl-epfl/x-heep) platform, extending it with a hybridly-quantized systolic array to optimize matrix-matrix multiply (GEMM) operations with FP32 activations and INT8 quantized-weights for neural networks. 
 
-HEEPstor is integrated with the PyTorch Python Machine Learning to streamline the model to hardware-accelerated edge-AI workflow. HEEPstor can automatically convert a PyTorch module into a hardware-accelerated C X-Heep application using our hybridly-quantized systolic-array, automatically handling weight quantization, DNN layer operator execution and buffer management. HEEPstor also generates a quantized PyTorch model after weight-quantization, to easily evaluate the X-Heep model accuracy without needing to run the whole test on the embedded device.
+HEEPstor is integrated with the PyTorch Python Machine Learning to streamline the model to hardware-accelerated edge-AI workflow. HEEPstor can automatically convert a PyTorch module into a hardware-accelerated C++ X-Heep application using our hybridly-quantized systolic-array, automatically handling weight quantization, DNN layer operator execution and buffer management. HEEPstor also generates a quantized PyTorch model after weight-quantization, to easily evaluate the X-Heep model accuracy without needing to run the whole test on the embedded device.
 
 # Capabilities
 
@@ -56,9 +56,9 @@ In order to generate a C++ application from a PyTorch model, do:
 
 There are several options that can be tweaked if needed:
 
-- Memory size: You can change the number of X-Heep HW memory banks by tweaking `MEMORY_BANKS` in the `Makefile`. If you run out of space for intermediate buffers or the input / output matrices, which are stored in the `StaticArenaAllocator`, you can increase its size by changing `StaticArenaAllocator::ARENA_SIZE` in `sw/external/memory/static_arena_allocator.h`.
-- Disable debug assertions: To speed-up operation, you can disable HEEPstor (which disables every `HEEPSTOR_ASSERT`) assertions by using `ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`: `make run-fpga-com PROJECT=your_project_name ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`.
-- Use software DNN layer operators instead of the systolic array: `make run-fpga-com PROJECT=your_project_name USE_SOFTWARE_DNN_LAYER_OPERATORS=1`.
+- **Memory size**: You can change the number of X-Heep HW memory banks by tweaking `MEMORY_BANKS` in the `Makefile`. If you run out of space for intermediate buffers or the input / output matrices, which are stored in the `StaticArenaAllocator`, you can increase its size by changing `StaticArenaAllocator::ARENA_SIZE` in `sw/external/memory/static_arena_allocator.h`.
+- **Disable debug assertions**: To speed-up operation, you can disable HEEPstor assertions (which disables every `HEEPSTOR_ASSERT`) by using `ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`: `make run-fpga-com PROJECT=your_project_name ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`.
+- **Use software DNN layer operators instead of the systolic array**: `make run-fpga-com PROJECT=your_project_name USE_SOFTWARE_DNN_LAYER_OPERATORS=1`.
 
 # Reference
 
