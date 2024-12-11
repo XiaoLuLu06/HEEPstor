@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     printf("\n");
     printf("====================================\n");
     printf("Hello from HEEPstor! \n");
-    printf("PROJECT: mnist-multi_layer\n");
+    printf("PROJECT: mnist-single_layer\n");
 #if USE_SOFTWARE_DNN_LAYER_OPERATORS
     printf("USING SOFTWARE DNN OPERATORS\n");
 #else
