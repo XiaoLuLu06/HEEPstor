@@ -44,13 +44,27 @@ In order to build the HW and SW C++ applications, do:
 4. Run `make vivado-fpga` to perform synthesis and implementation to generate the bitstream for the FPGA.
 5. Load the bitstream into the FPGA using Vivado Hardware Manager.
 6. Run `make app PROJECT=your_project_name` to build the application in folder `sw/applications/your_project_name`.
-7. Run `make run-fpga-com PROJECT=your_project_name` to load the application into the Flash.
+7. Run `make run-fpga-com PROJECT=your_project_name` to load the application into the Flash if you have an ESL-EPFL programmer for X-Heep attached. Otherwise, if you want to load using OpenOCD, see the corrersponding section below.
 
 In order to generate a C++ application from a PyTorch model, do:
 
 1. Write your Python application in `python-dnn/apps`. Take a look at some examples such as `mnist-single_layer` or `mnist-multi_layer`. The HEEPstor implementation with PyTorch is in the `heepstorch` package, stored in `python-dnn/heepstorch`.
 2. Install the prerequisites into your Python installation. The prerequisites can be found in `python-dnn/requirements.txt`.
 3. Run the Python application by adding `PYTHONPATH=/your/absolute/path/to/python-dnn/`: `PYTHONPATH=/your/absolute/path/to/python-dnn/ python3 python-dnn/apps/your-app/main.py`. Alternatively, you can open the folder `python-dnn` in an IDE such as PyCharm, which will then handle PYTHONPATH. Run each Python app inside their respective folders, as most of them will download some datasets (such as MNIST). We recommend using PyCharm, which automatically takes care of this.
+
+## Running and debugging using OpenOCD
+
+You will need to open 3 terminal windows, one with the UART screen, another for OpenOCD and a third one for gdb. Follow the official X-Heep instructions for installing OpenOCD (https://x-heep.readthedocs.io/en/latest/How_to/Debug.html).
+
+To open those windows, run the following commands:
+1. `make picocom`
+2. `make openocd`
+3. `make gdb`
+
+In the GDB window, you can use the following commands:
+- `load` to load the executable into memory. By default, `make gdb` runs load after connecting to the OpenOCD GDB server.
+- `continue` to execute the loaded executable.
+- `monitor reset halt` to reset all non-debug modules (including the CPU).
 
 ## Options
 
