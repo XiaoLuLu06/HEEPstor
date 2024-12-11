@@ -120,6 +120,15 @@ app: link_build
 	$(PYTHON) util/heepstor_defs.py --enable-debug $(ENABLE_DEBUG_HEEPSTOR_ASSERTIONS) --use-software-dnn $(USE_SOFTWARE_DNN_LAYER_OPERATORS) sw/external/heepstor_defs.h.tpl
 	$(MAKE) xheep_app PROJECT=$(PROJECT) LINKER=flash_load TARGET=$(FPGA_BOARD) ARCH=rv32imfc
 
+picocom:
+	picocom -b 9600 -r -l --imap lfcrlf /dev/serial/by-id/usb-FTDI_Quad_RS232-HS-if02-port0
+
+openocd:
+	openocd -f ./hw/vendor/esl_epfl_x_heep/tb/core-v-mini-mcu-pynq-z2-esl-programmer.cfg
+
+gdb: app
+	$(RISCV)/bin/riscv32-unknown-elf-gdb sw/build/main.elf -x util/gdb_openocd_commands
+
 XHEEP_MAKE = $(HEEP_DIR)/external.mk
 
 .PHONY: xheep_app
