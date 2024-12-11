@@ -59,7 +59,7 @@ You will need to open 3 terminal windows, one with the UART screen, another for 
 To open those windows, run the following commands:
 1. `make picocom`
 2. `make openocd`
-3. `make gdb`
+3. `make gdb PROJECT=PROJECT_NAME`. This application calls `make app` before running GDB, with the provided arguments (such as `PROJECT` or other options). 
 
 In the GDB window, you can use the following commands:
 - `load` to load the executable into memory. By default, `make gdb` runs load after connecting to the OpenOCD GDB server.
