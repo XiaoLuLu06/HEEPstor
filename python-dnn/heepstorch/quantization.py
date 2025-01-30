@@ -97,5 +97,5 @@ def fake_quantize(
     Returns:
         matrix_fp32 after applying quantization and dequantization
     """
-    matrix_int8, scaling_actor = quantize(matrix_fp32, qscheme)
-    return dequantize(matrix_int8, scaling_actor, qscheme)
+    matrix_int8, scaling_factor = quantize(matrix_fp32, qscheme)
+    return dequantize(matrix_int8, scaling_factor, qscheme)

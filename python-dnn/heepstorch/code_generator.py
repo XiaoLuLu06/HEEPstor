@@ -385,3 +385,23 @@ class CodeGenerator:
         c_code += "\n};"
 
         return c_code, array_size
+
+
+def flatten_input_to_matrix(x: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    """
+        Flattens the input tensor (with possible multiple channels) to a 2-d matrix to be
+        passed as input to the generated C code for executing convolutions with im2col transformations.
+    Args:
+        x: input tensor of shape [BATCH_SIZE, NUM_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH]. Note that BATCH_SIZE must be 1.
+            or tensor of shape [NUM_CHANNELS, IMAGE_HEIGHT, IMAGE_WIDTH]
+    Returns:
+        2-d matrix of shape [IMAGE_HEIGHT * IMAGE_WIDTH, NUM_CHANNELS]
+    """
+
+    if len(x.shape) == 3:
+        NUM_CHANNELS, H, W = x.shape
+    else:
+        BATCH_SIZE, NUM_CHANNELS, H, W = x.shape
+        assert BATCH_SIZE == 1
+
+    return x.reshape(NUM_CHANNELS, H * W).T
