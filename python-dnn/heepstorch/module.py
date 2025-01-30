@@ -327,8 +327,10 @@ class Flatten(Module):
         self.quantized_torch_module = copy.deepcopy(torch_module)
 
     def forward_quantized(self, x: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
-        # Flatten row by row into a 1-d array, and construct a row matrix from it (1 row, M columns).
-        return x.flatten().reshape([1, -1])
+        # Flatten column by column into a 1-d array, and construct a row matrix from it (1 row, M columns).
+        # The input is a matrix with one image channel in each column, and the output 1-d array has the flattened images
+        #  of each channel concatenated side by side.
+        return x.T.flatten().reshape([1, -1])
 
     def get_quantized_torch_module(self) -> torch.nn.Module:
         return self.quantized_torch_module
@@ -396,3 +398,6 @@ class SequentialNetwork:
 
     def __call__(self, *args, **kwargs):
         return self.forward(*args, **kwargs)
+
+    def get_module_by_name(self, name: str):
+        return self.modules[name]
