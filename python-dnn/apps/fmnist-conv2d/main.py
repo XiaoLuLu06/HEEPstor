@@ -211,8 +211,8 @@ def main(retrain=False, use_gpu_if_available=True):
 
     print_test_predictions_forward_pass(test_loader, hp_nn, 5)
 
-    # cg = hp.code_generator.CodeGenerator('mnist-multi_layer', hp_nn)
-    # cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
+    cg = hp.code_generator.CodeGenerator('fmnist-conv2d', hp_nn)
+    cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
     # cg.generate_example_main('main.cpp', pred_res['input_matrix'], pred_res['expected_output_prob_matrix'],
     #                          pred_res['expected_predictions'], pred_res['true_label_values'],
     #                          overwrite_existing_generated_files=True)

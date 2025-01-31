@@ -232,7 +232,7 @@ class ReLU(Module):
     def get_quantized_torch_module(self) -> torch.nn.Module:
         return self.quantized_torch_module
 
-    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str):
+    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
         return None, None, None
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
@@ -303,8 +303,47 @@ class Conv2d(Module):
     def get_quantized_torch_module(self) -> torch.nn.Module:
         return self.quantized_torch_module
 
+    def weight_matrix_varname(self) -> str:
+        return f'{self.name}_kernel_weights'
+
+    def bias_matrix_varname(self) -> str:
+        return f'{self.name}_bias'
+
+    def weight_data_varname(self) -> str:
+        return f'{self.name}_kernel_weight_data'
+
+    def weight_scale_varname(self) -> str:
+        return f'{self.name}_kernel_weight_scale'
+
+    def bias_data_varname(self) -> str:
+        return f'{self.name}_bias_data'
+
     def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
-        raise NotImplementedError()
+        c_code_weight_data, weight_arr_size = CodeGenerator.quantized_weights_to_packed_c_array(
+            self.kernel_matrix_quantized,
+            self.weight_data_varname())
+
+        c_code_weight_scale = f'static constexpr float {self.weight_scale_varname()} = {self.kernel_scale:.9g};'
+
+        assert len(self.bias.shape) == 1
+        c_code_bias_data, bias_arr_size = CodeGenerator.bias_to_c_array(self.bias, self.bias_data_varname())
+
+        model_parameter_definitions = '\n\n'.join([c_code_weight_scale, c_code_weight_data, c_code_bias_data])
+
+        weight_shape = self.kernel_matrix_quantized.shape
+        assert len(weight_shape) == 2
+
+        c_code_wrapper_weights = f'const PackedInt8Matrix {self.weight_matrix_varname()} = PackedInt8Matrix::from_const_pointer(ModelParameters::{self.weight_data_varname()}, {weight_shape[0]}, {weight_shape[1]});'
+        c_code_wrapper_bias = f'const Matrix<float> {self.bias_matrix_varname()} = Matrix<float>::from_const_pointer(ModelParameters::{self.bias_data_varname()}, 1, {bias_arr_size});'
+
+        wrapper = '\n'.join([c_code_wrapper_weights, c_code_wrapper_bias])
+
+        weight_data_declaration = f'constexpr uint32_t ModelParameters::{self.weight_data_varname()}[{weight_arr_size}];'
+        bias_data_declaration = f'constexpr float ModelParameters::{self.bias_data_varname()}[{bias_arr_size}];'
+
+        declarations = '\n'.join([weight_data_declaration, bias_data_declaration])
+
+        return model_parameter_definitions, wrapper, declarations
 
     def performs_inference_in_place(self) -> bool:
         raise NotImplementedError()
@@ -319,7 +358,7 @@ class Conv2d(Module):
         return self.name
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
-        raise NotImplementedError()
+        return f'Conv2d::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name});'
 
 
 class Flatten(Module):
@@ -342,7 +381,7 @@ class Flatten(Module):
         return self.quantized_torch_module
 
     def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
-        raise NotImplementedError()
+        return None, None, None
 
     def performs_inference_in_place(self) -> bool:
         raise NotImplementedError()
@@ -357,7 +396,7 @@ class Flatten(Module):
         return self.name
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
-        raise NotImplementedError()
+        return f'Flatten::forward(systolic_array, {input_buffer_name}, {output_buffer_name});'
 
 
 class SequentialNetwork:
