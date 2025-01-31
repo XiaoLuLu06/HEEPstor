@@ -10,17 +10,24 @@
 
 class Model {
 public:
+    // Input configuration
     static constexpr size_t NUM_INPUT_FEATURES = 144;
+
+    // Output configuration
     static constexpr size_t NUM_OUTPUT_FEATURES = 10;
 
-    // inputs is a matrix of shape [BATCH_SIZE x NUM_INPUT_FEATURES], outputs is a matrix of shape [BATCH_SIZE x NUM_OUTPUT_FEATURES]
     static void infer(SystolicArray& systolic_array, const Matrix<float>& inputs, Matrix<float>& outputs,
                       CheckpointPerformanceTimerDisplayConfig display_config) {
+
+        //////////////////////////////////////////////
+        // Validate input and output matrix
+        //////////////////////////////////////////////
+
         HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_FEATURES);
         HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
         HEEPSTOR_ASSERT(inputs.num_rows() == outputs.num_rows());
 
-        const size_t BATCH_SIZE = inputs.num_rows();
+        const size_t batch_size = inputs.num_rows();
 
         //////////////////////////////////////////////
         //  Wrap the model parameters into matrices.
@@ -41,7 +48,7 @@ public:
         //  Declare intermediate buffers
         //////////////////////////////////////////////
 
-        Matrix<float> intermediate_buf_1(BATCH_SIZE, 20);
+        Matrix<float> intermediate_buf_1(batch_size, 20);
 
         //////////////////////////////////////////////
         //  Perform inference steps

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional, Tuple, List
 
 import heepstorch as hp
 import numpy as np
@@ -15,7 +16,20 @@ HEEPSTOR_C_APPS_DIR = SCRIPT_DIR.parent.parent / 'sw' / 'applications'
 @dataclass
 class Buffer:
     name: str
-    num_features: int
+    channels: int
+    mode: 'hp.module.NetworkMode'
+    image_dims: Optional['hp.module.ImageDimensions'] = None
+
+    def get_declaration_code(self) -> str:
+        """Returns C++ code to declare this buffer based on mode"""
+        if self.mode == hp.module.NetworkMode.CONV:
+            if self.image_dims is None:
+                raise ValueError(f"Buffer {self.name} in CONV mode but has no image dimensions")
+            # For conv mode: fixed dimensions based on image size
+            return f'Matrix<float> {self.name}({self.image_dims.height}*{self.image_dims.width}, {self.channels});'
+        else:
+            # For linear mode: dynamic batch size from input
+            return f'Matrix<float> {self.name}(batch_size, {self.channels});'
 
 
 class CodeGenerator:
@@ -30,86 +44,98 @@ class CodeGenerator:
         indent = ' ' * spaces
         return '\n'.join(indent + line if line else line for line in text.splitlines())
 
-    def generate_code(self, append_final_softmax, overwrite_existing_generated_files=False):
+    def generate_code(self, append_final_softmax: bool, overwrite_existing_generated_files: bool = False):
         """
         Generates all necessary C code for inference in Heepstor, and writes it to the provided project.
         """
 
-        def gen_mod_constexpr_definitions_and_wrapper(name: str, mod: 'hp.module.Module') -> (str, str):
+        def gen_mod_constexpr_definitions_and_wrapper(name: str, mod: 'hp.module.Module') -> Tuple[
+            Optional[str], Optional[str], Optional[str]]:
             layer_name_and_type = f'{name}: {type(mod).__name__}'
-
             raw_constexpr_defs, raw_wrapper, raw_declarations = mod.generate_model_parameters_c_code_constexpr_definitions()
 
-            # 1. Generate constexpr definitions
-
             if raw_constexpr_defs is None:
-                constexpr_definitions = None
-            else:
-                constexpr_def_header = '//' + '/' * 20 + '\n'
-                constexpr_def_header += f'//   {layer_name_and_type}\n'
-                constexpr_def_header += '//' + '/' * 20 + '\n' * 2
-                constexpr_definitions = constexpr_def_header + raw_constexpr_defs
+                return None, None, None
 
-            # 2. Generate wrappers
+            constexpr_def_header = '//' + '/' * 20 + '\n'
+            constexpr_def_header += f'//   {layer_name_and_type}\n'
+            constexpr_def_header += '//' + '/' * 20 + '\n' * 2
 
-            if raw_wrapper is None:
-                wrapper = None
-            else:
-                wrapper_header = f'// {layer_name_and_type}\n'
-                wrapper = wrapper_header + raw_wrapper
+            wrapper_header = f'// {layer_name_and_type}\n'
+            declarations_header = f'// {layer_name_and_type}\n'
 
-            # 3. Generate declarations
-            if raw_declarations is None:
-                declarations = None
-            else:
-                declarations_wrapper = f'// {layer_name_and_type}\n'
-                declarations = declarations_wrapper + raw_declarations
+            return (
+                constexpr_def_header + raw_constexpr_defs,
+                wrapper_header + raw_wrapper,
+                declarations_header + raw_declarations
+            )
 
-            return constexpr_definitions, wrapper, declarations
+        # Generate code for all modules
+        modules_code = [
+            gen_mod_constexpr_definitions_and_wrapper(n, m)
+            for n, m in self.sequential_network.modules.items()
+        ]
 
-        model_parameter_constexpr_definitions, wrapper, declarations = \
-            ['\n\n'.join([e for e in x if e is not None]) for x in zip(*[gen_mod_constexpr_definitions_and_wrapper(n, m)
-                                                                         for n, m in
-                                                                         self.sequential_network.modules.items()])]
+        model_parameter_constexpr_definitions = '\n\n'.join(
+            [c for c, _, _ in modules_code if c is not None])
+        wrapper = '\n\n'.join([w for _, w, _ in modules_code if w is not None])
+        declarations = '\n\n'.join([d for _, _, d in modules_code if d is not None])
 
-        buffer_declarations, inference_steps, num_input_features, num_output_features = self.generate_inference_function(
+        # Generate inference code
+        buffer_declarations, inference_steps, input_info, output_info = self.generate_inference_function(
             append_final_softmax)
 
-        num_layers = len(self.sequential_network.modules) + 1 if append_final_softmax else 0
-        perf_timer_layer_list = [f'{m.get_name()} ({type(m).__name__})' for m in
-                                 self.sequential_network.modules.values()]
-
+        # Handle performance timer configuration
+        num_layers = len(self.sequential_network.modules) + (1 if append_final_softmax else 0)
+        perf_timer_layer_list = [
+            f'{m.get_name()} ({type(m).__name__})'
+            for m in self.sequential_network.modules.values()
+        ]
         if append_final_softmax:
             perf_timer_layer_list.append('Final Softmax')
 
-        # Read template files
+        # Read templates
         model_hpp = (CODEGEN_TEMPLATE_DIR / 'model.hpp.tpl').read_text()
         model_parameters_hpp = (CODEGEN_TEMPLATE_DIR / 'model_parameters.hpp.tpl').read_text()
         model_parameters_cpp = (CODEGEN_TEMPLATE_DIR / 'model_parameters.cpp.tpl').read_text()
 
-        # Create template substitutions
+        # Create substitutions
         model_hpp_template = Template(model_hpp)
         model_parameters_hpp_template = Template(model_parameters_hpp)
         model_parameters_cpp_template = Template(model_parameters_cpp)
 
-        # Substitute values in templates
-        model_hpp_indent_space_num = 8
+        # Check if network supports batching
+        supports_batching = all(
+            m.network_mode() == hp.module.NetworkMode.LINEAR
+            for m in self.sequential_network.modules.values()
+        )
 
+        validation_code = """HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_FEATURES);
+HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
+HEEPSTOR_ASSERT(inputs.num_rows() == outputs.num_rows());
+
+const size_t batch_size = inputs.num_rows();""" if supports_batching else """HEEPSTOR_ASSERT(inputs.num_rows() == INPUT_HEIGHT * INPUT_WIDTH);
+HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_CHANNELS);
+HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
+HEEPSTOR_ASSERT(outputs.num_rows() == 1);
+
+const size_t batch_size = 1;"""
+
+        # Generate content
         model_hpp_content = model_hpp_template.substitute(
-            NUM_INPUT_FEATURES=num_input_features,
-            NUM_OUTPUT_FEATURES=num_output_features,
-            MODEL_PARAMETER_WRAPPERS=self.indent_lines(wrapper, model_hpp_indent_space_num),
-            INTERMEDIATE_BUFFER_DECLARATIONS=self.indent_lines(buffer_declarations, model_hpp_indent_space_num),
-            INFERENCE_STEPS=self.indent_lines(inference_steps, model_hpp_indent_space_num),
+            INPUT_INFO=self.indent_lines(input_info, 4),
+            OUTPUT_INFO=self.indent_lines(output_info, 4),
+            VALIDATION_CODE=self.indent_lines(validation_code, 8),
+            MODEL_PARAMETER_WRAPPERS=self.indent_lines(wrapper, 8),
+            INTERMEDIATE_BUFFER_DECLARATIONS=self.indent_lines(buffer_declarations, 8),
+            INFERENCE_STEPS=self.indent_lines(inference_steps, 8),
             NUM_LAYERS=num_layers,
             PERF_TIMER_LAYER_LIST=', '.join([f'"{x}"' for x in perf_timer_layer_list])
         )
 
-        model_parameters_hpp_indent_space_num = 4
-
         model_parameters_hpp_content = model_parameters_hpp_template.substitute(
-            MODEL_PARAMETER_CONSTEXPR_DEFINITIONS=self.indent_lines(model_parameter_constexpr_definitions,
-                                                                    model_parameters_hpp_indent_space_num)
+            MODEL_PARAMETER_CONSTEXPR_DEFINITIONS=self.indent_lines(
+                model_parameter_constexpr_definitions, 4)
         )
 
         model_parameters_cpp_content = model_parameters_cpp_template.substitute(
@@ -117,7 +143,6 @@ class CodeGenerator:
         )
 
         # Write templated files.
-
         project_dir = HEEPSTOR_C_APPS_DIR / self.project_name
         gen_dir = project_dir / 'gen'
 
@@ -190,131 +215,105 @@ class CodeGenerator:
 
         dest_file.write_text(content)
 
-    def generate_buffers(self) -> [Buffer]:
+    def generate_buffers(self) -> List[Buffer]:
         """
         Generates name and sizes for all buffers, including input, output and intermediate buffers. Only generates
         intermediate buffers for operations not done in place.
         """
 
-        # TODO: In the future, when we support convolutional neural networks, the buffer management system will have to
-        #  be reworked if we still want to keep supporting only matrices. In that case, maybe we can force the inference
-        #  to have a batch_size of 1, and use the number of rows instead to represent the different channels of the
-        #  convolutional operation.
-
-        # TODO: In the future, do a smarter allocation strategy. For example, use two arenas from which we instantiate
-        #  matrices and ping-pong them, and clean the unused arena after each stage. For now, we will keep it simple.
-
         modules = list(self.sequential_network.modules.values())
-        num_buffers = 1 + sum([0 if m.performs_inference_in_place() else 1 for m in modules])
+        current_mode = (hp.module.NetworkMode.CONV
+                        if self.sequential_network.input_dimensions
+                        else hp.module.NetworkMode.LINEAR)
+        current_channels = None
+        current_dims = self.sequential_network.input_dimensions
 
-        # For now, assume that there will always be a non-in-place operation.
-        assert num_buffers >= 2
+        buffers = []
 
-        buffers = [Buffer('inputs' if i == 0 else 'outputs' if i == num_buffers - 1 else f'intermediate_buf_{i}', None)
-                   for i in range(num_buffers)]
+        # Input buffer
+        buffers.append(Buffer("inputs",
+                              modules[0].num_input_channels() or 1,
+                              current_mode,
+                              current_dims))
 
-        # Perform two different passes in order to propagate the number of feature of sizes. First a forward one, and
-        #  then a backward one. Note that some layers such as ReLU can operate on a buffer of any size, so they depend
-        #  on having another layer such as Linear that defines the actual sizing. If we cannot figure out the buffer
-        #  sizes, return an error.
+        # Generate intermediate buffers
+        for i, module in enumerate(modules):
+            if module.num_input_channels() is not None:
+                current_channels = module.num_input_channels()
 
-        # 1. Forward pass
-        current_features = None
-        buffer_idx = 0
+            # Update dimensions for CONV mode
+            if current_mode == hp.module.NetworkMode.CONV:
+                current_dims = module.output_image_dimensions(current_dims, None)
 
-        for module in modules:
-            # Validate input features match if module specifies them
-            if module.num_input_features() is not None:
-                if current_features is not None and current_features != module.num_input_features():
-                    raise ValueError(
-                        f"Module {module.get_name()} ({type(module).__name__}) expects {module.num_input_features()} input features but receives {current_features}")
-                current_features = module.num_input_features()
+            # Handle CONV -> LINEAR transitions
+            if isinstance(module, hp.module.Flatten):
+                current_mode = hp.module.NetworkMode.LINEAR
+                current_dims = None
 
-            if current_features is not None:
-                buffers[buffer_idx].num_features = current_features
-
-            if module.num_output_features() is not None:
-                current_features = module.num_output_features()
-
+            # Create new buffer if needed
             if not module.performs_inference_in_place():
-                buffer_idx += 1
+                buffer_name = f"intermediate_buf_{len(buffers)}" if i < len(modules) - 1 else "outputs"
+                buffers.append(Buffer(
+                    buffer_name,
+                    current_channels if module.num_output_channels() is None else module.num_output_channels(),
+                    current_mode,
+                    current_dims
+                ))
 
-        # 2. Backward pass
-        current_features = None
-        buffer_idx = len(buffers) - 1
-
-        for module in reversed(modules):
-            if module.num_output_features() is not None:
-                if current_features is not None and current_features != module.num_output_features():
-                    raise ValueError(
-                        f"Module {module.get_name()} ({type(module).__name__}) outputs {module.num_output_features()} features but next layer expects {current_features}")
-                current_features = module.num_output_features()
-
-            if current_features is not None:
-                buffers[buffer_idx].num_features = current_features
-
-            if module.num_input_features() is not None:
-                current_features = module.num_input_features()
-
-            if not module.performs_inference_in_place():
-                assert buffer_idx > 0
-                buffer_idx -= 1
-
-        # Validate all buffers have sizes
-        for buf in buffers:
-            if buf.num_features is None:
-                raise ValueError(f"Could not determine size for buffer {buf.name}")
+            if module.num_output_channels() is not None:
+                current_channels = module.num_output_channels()
 
         return buffers
 
-    def generate_inference_function(self, append_final_softmax) -> (str, str, int, int):
-        """
-        Returns two strings and two integers. The first string is the code for instantiating intermediate buffers to be used
-        during the inference, and the second string is the code for performing the inference. The first integer is the
-        number of input features and the second integer is the number of output features.
-        """
-
-        # 1. Intermediate storage
+    def generate_inference_function(self, append_final_softmax: bool) -> Tuple[str, str, str, str]:
+        """Generate C++ inference code and configuration"""
         buffers = self.generate_buffers()
+
+        # Network is batch-capable only if all layers after first are LINEAR mode
+        supports_batching = all(b.mode == hp.module.NetworkMode.LINEAR for b in buffers[1:])
+
+        # Generate input/output configuration
+        if supports_batching:
+            input_info = f"static constexpr size_t NUM_INPUT_FEATURES = {buffers[0].channels};"
+        else:
+            input_info = f"""static constexpr size_t NUM_INPUT_CHANNELS = {buffers[0].channels};
+static constexpr size_t INPUT_HEIGHT = {buffers[0].image_dims.height};
+static constexpr size_t INPUT_WIDTH = {buffers[0].image_dims.width};"""
+
+        output_info = f"static constexpr size_t NUM_OUTPUT_FEATURES = {buffers[-1].channels};"
+
+        # Generate buffer declarations, skipping input/output buffers
         buffer_declarations = []
-
-        # Skip input and output declarations, which are arguments to the function.
         for buffer in buffers[1:-1]:
-            # TODO: When implementing Conv2d layers, this will have to be changed.
-            buffer_declarations.append(f'Matrix<float> {buffer.name}(BATCH_SIZE, {buffer.num_features});')
+            buffer_declarations.append(buffer.get_declaration_code())
 
-        buffer_declaration_c_code = '\n'.join(buffer_declarations)
-
-        # 2. Inference steps.
-
+        # Generate inference steps
         inference_steps = []
-
         buffer_idx = 0
-
-        last_idx = None
-
         for i, (name, module) in enumerate(self.sequential_network.modules.items()):
             inference_steps.append(f'// {i + 1}. {name}: {type(module).__name__}')
 
             input_buffer = buffers[buffer_idx]
             output_buffer = buffers[buffer_idx] if module.performs_inference_in_place() else buffers[buffer_idx + 1]
 
-            inference_steps.append(module.generate_inference_c_code(input_buffer.name, output_buffer.name))
+            inference_steps.append(module.generate_inference_c_code(
+                input_buffer.name, output_buffer.name))
             inference_steps.append('performance_timer.checkpoint();\n')
 
             if not module.performs_inference_in_place():
                 buffer_idx += 1
 
-            last_idx = i
-
         if append_final_softmax:
-            inference_steps.append(f'// {last_idx + 2}. Final Softmax')
+            inference_steps.append(f'// {len(self.sequential_network.modules) + 1}. Final Softmax')
             inference_steps.append(f'Softmax::forward({buffers[-1].name});')
             inference_steps.append('performance_timer.checkpoint();')
 
-        inference_steps_c_code = '\n'.join(inference_steps)
-
-        return buffer_declaration_c_code, inference_steps_c_code, buffers[0].num_features, buffers[-1].num_features
+        return (
+            '\n'.join(buffer_declarations),
+            '\n'.join(inference_steps),
+            input_info,
+            output_info
+        )
 
     @staticmethod
     def quantized_weights_to_packed_c_array(x: npt.NDArray[np.int8], identifier_name: str) -> (str, int):

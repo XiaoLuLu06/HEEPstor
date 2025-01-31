@@ -200,7 +200,7 @@ def main(retrain=False, use_gpu_if_available=True):
     model = load_or_train_model(train_loader, test_loader, criterion, device, retrain)
     # get_test_predictions(model, test_loader, device, 5)
 
-    hp_nn = hp.module.SequentialNetwork.from_torch_sequential(model)
+    hp_nn = hp.module.SequentialNetwork.from_torch_sequential(model, IMAGE_SIZE, IMAGE_SIZE, CHANNELS)
     quantized_torch_model = hp_nn.get_quantized_torch_module()
 
     test(quantized_torch_model, test_loader, criterion, device, "quantized")

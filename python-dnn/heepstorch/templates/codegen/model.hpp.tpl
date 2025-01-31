@@ -10,17 +10,20 @@
 
 class Model {
 public:
-    static constexpr size_t NUM_INPUT_FEATURES = $NUM_INPUT_FEATURES;
-    static constexpr size_t NUM_OUTPUT_FEATURES = $NUM_OUTPUT_FEATURES;
+    // Input configuration
+$INPUT_INFO
 
-    // inputs is a matrix of shape [BATCH_SIZE x NUM_INPUT_FEATURES], outputs is a matrix of shape [BATCH_SIZE x NUM_OUTPUT_FEATURES]
+    // Output configuration
+$OUTPUT_INFO
+
     static void infer(SystolicArray& systolic_array, const Matrix<float>& inputs, Matrix<float>& outputs,
-                      CheckpointPerformanceTimerDisplayConfig display_config) {
-        HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_FEATURES);
-        HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
-        HEEPSTOR_ASSERT(inputs.num_rows() == outputs.num_rows());
+                     CheckpointPerformanceTimerDisplayConfig display_config) {
 
-        const size_t BATCH_SIZE = inputs.num_rows();
+        //////////////////////////////////////////////
+        // Validate input and output sizes
+        //////////////////////////////////////////////
+
+$VALIDATION_CODE
 
         //////////////////////////////////////////////
         //  Wrap the model parameters into matrices.
