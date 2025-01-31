@@ -249,6 +249,12 @@ class Conv2d(Module):
         self.name = name
         self.torch_module = torch_module
 
+        # For now, we only support padding=0, stride=1, dilation=1 and groups=1.
+        assert torch_module.padding == (0, 0)
+        assert torch_module.groups == 1
+        assert torch_module.stride == (1, 1)
+        assert torch_module.dilation == (1, 1)
+
         w = torch_module.weight.data.cpu().detach().numpy()
 
         # Number of output channels, input channels, kernel size
