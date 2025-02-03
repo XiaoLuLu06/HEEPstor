@@ -374,6 +374,18 @@ static constexpr size_t INPUT_WIDTH = {buffers[0].image_dims.width};"""
         buffer_declarations.append(
             f'float* pong_buffer = StaticArenaAllocator::allocate_array<float>({pong_buffer_size_str});')
 
+        # Add im2row buffer for convolutions
+        if is_network_cnn:
+            im2row_buffer_size = max(
+                module.get_im2row_buffer_size()
+                for module in self.sequential_network.modules.values()
+                if isinstance(module, hp.module.Conv2d)
+            )
+
+            buffer_declarations.append(
+                f'\nfloat* {hp.module.Conv2d.get_im2row_buffer_name()} = StaticArenaAllocator::allocate_array<float>({im2row_buffer_size});'
+            )
+
         # New line to separate ping / pong buffers from intermediate matrices
         buffer_declarations.append('')
 

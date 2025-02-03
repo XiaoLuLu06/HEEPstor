@@ -56,6 +56,8 @@ public:
         float* ping_buffer = StaticArenaAllocator::allocate_array<float>(1936);
         float* pong_buffer = StaticArenaAllocator::allocate_array<float>(512);
 
+        float* im2row_buffer = StaticArenaAllocator::allocate_array<float>(16384);
+
         Matrix<float> intermediate_buf_1(ping_buffer, 11*11, 16);
         Matrix<float> intermediate_buf_2(pong_buffer, 8*8, 8);
         Matrix<float> intermediate_buf_3(ping_buffer, 1, 512);
@@ -65,7 +67,7 @@ public:
         //////////////////////////////////////////////
 
         // 1. conv1: Conv2d
-        Conv2d::forward(systolic_array, inputs, conv1_kernel_weights, ModelParameters::conv1_kernel_weight_scale, conv1_bias, intermediate_buf_1, 4, 1, 14, 14);
+        Conv2d::forward(systolic_array, inputs, conv1_kernel_weights, ModelParameters::conv1_kernel_weight_scale, conv1_bias, intermediate_buf_1, 4, 1, 14, 14, im2row_buffer);
         performance_timer.checkpoint();
 
         // 2. relu1: ReLU
@@ -73,7 +75,7 @@ public:
         performance_timer.checkpoint();
 
         // 3. conv2: Conv2d
-        Conv2d::forward(systolic_array, intermediate_buf_1, conv2_kernel_weights, ModelParameters::conv2_kernel_weight_scale, conv2_bias, intermediate_buf_2, 4, 16, 11, 11);
+        Conv2d::forward(systolic_array, intermediate_buf_1, conv2_kernel_weights, ModelParameters::conv2_kernel_weight_scale, conv2_bias, intermediate_buf_2, 4, 16, 11, 11, im2row_buffer);
         performance_timer.checkpoint();
 
         // 4. relu2: ReLU

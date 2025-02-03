@@ -11,6 +11,8 @@ import copy
 from enum import Enum
 from dataclasses import dataclass
 
+from sympy.codegen.cnodes import static
+
 from heepstorch import quantization
 from heepstorch.code_generator import CodeGenerator
 from heepstorch import im2row
@@ -330,6 +332,7 @@ class Conv2d(Module):
         # This will be filled out in a later pass
         self.input_height = None
         self.input_width = None
+        self.out_dims = None
 
     def quantize_torch_module(self, non_quantized_torch_module: torch.nn.Module) -> torch.nn.Module:
         quantized_module = copy.deepcopy(non_quantized_torch_module)
@@ -404,16 +407,29 @@ class Conv2d(Module):
 
         return model_parameter_definitions, wrapper, declarations
 
+    def get_im2row_buffer_size(self) -> int:
+        """
+        Returns the number of floating point elements needed to hold the im2row matrix
+        """
+        return self.out_dims.num_pixels() * self.C_IN * self.N * self.N
+
     def output_image_dimensions(self, input_dims: ImageDimensions, input_channels: Optional[int]) -> ImageDimensions:
         if input_dims is None:
             raise ValueError("Conv2d requires input dimensions")
+
+        if input_channels is not None:
+            assert self.num_input_channels() == input_channels
 
         self.input_height = input_dims.height
         self.input_width = input_dims.width
 
         out_height = input_dims.height - self.N + 1
         out_width = input_dims.width - self.N + 1
-        return ImageDimensions(out_height, out_width)
+
+        out_dims = ImageDimensions(out_height, out_width)
+
+        self.out_dims = out_dims
+        return out_dims
 
     def network_mode(self) -> NetworkMode:
         return NetworkMode.CONV
@@ -430,11 +446,15 @@ class Conv2d(Module):
     def get_name(self) -> str:
         return self.name
 
+    @staticmethod
+    def get_im2row_buffer_name() -> str:
+        return 'im2row_buffer'
+
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
         assert self.input_width is not None
         assert self.input_height is not None
 
-        return f'Conv2d::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name}, {self.N}, {self.num_input_channels()}, {self.input_height}, {self.input_width});'
+        return f'Conv2d::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name}, {self.N}, {self.num_input_channels()}, {self.input_height}, {self.input_width}, {self.get_im2row_buffer_name()});'
 
 
 class Flatten(Module):

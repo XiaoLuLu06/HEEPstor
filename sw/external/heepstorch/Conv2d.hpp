@@ -6,9 +6,11 @@
 
 class Conv2d {
 public:
+    // If im2row_buffer != nullptr, it will be used as the backend storage for the im2row_res matrix. This helps reuse buffer storage between
+    //  all conv layers, which can result in quite big storage savings
     static void forward(SystolicArray& systolic_array, const Matrix<float>& activations, const PackedInt8Matrix& quantized_kernel_weights,
                         float quantized_kernel_weight_scale, const Matrix<float>& bias, Matrix<float>& out, size_t kernel_size,
-                        size_t num_input_channels, size_t height, size_t width) {
+                        size_t num_input_channels, size_t height, size_t width, float* im2row_buffer = nullptr) {
 
         HEEPSTOR_ASSERT(activations.num_rows() == height * width);
         HEEPSTOR_ASSERT(activations.num_cols() == num_input_channels);
@@ -17,7 +19,10 @@ public:
         size_t width_out = width - kernel_size + 1;
 
         // Compute im2row transformation
-        Matrix<float> im2row_res(height_out * width_out, num_input_channels * kernel_size * kernel_size);
+        Matrix<float> im2row_res = im2row_buffer != nullptr
+                                       ? Matrix<float>(im2row_buffer, height_out * width_out, num_input_channels * kernel_size * kernel_size)
+                                       : Matrix<float>(height_out * width_out, num_input_channels * kernel_size * kernel_size);
+
         im2row(activations, im2row_res, kernel_size, num_input_channels, height, width);
 
         // Multiply the im2row transformed activations with the quantized pre-laid out kernel weights
