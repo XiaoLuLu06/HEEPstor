@@ -6,7 +6,7 @@ class Flatten {
 public:
     static void forward(const Matrix<float>& input, Matrix<float>& output) {
         const size_t image_width_times_height = input.num_rows();
-        const size_t num_input_channels = input.num_rows();
+        const size_t num_input_channels = input.num_cols();
 
         HEEPSTOR_ASSERT(output.num_rows() == 1);
         HEEPSTOR_ASSERT(output.num_cols() == image_width_times_height * num_input_channels);

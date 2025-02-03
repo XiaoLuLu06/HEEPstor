@@ -1,6 +1,6 @@
 #pragma once
 
-// TODO: Check if we can use cmath instead and see if these functions are faster.
+#include <cstdint>
 
 // Computes the largest integer value not greater than x
 int32_t fastfloorf(float x);

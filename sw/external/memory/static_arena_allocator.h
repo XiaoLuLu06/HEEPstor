@@ -11,7 +11,7 @@
 // TODO: Study whether this is a better approach than just using malloc.
 class StaticArenaAllocator {
 private:
-    static constexpr size_t ARENA_SIZE = 32 * 1024;  // 32 KiB
+    static constexpr size_t ARENA_SIZE = 256 * 1024;  // 256 KiB
     alignas(std::max_align_t) static uint8_t buffer[ARENA_SIZE];
     static size_t currentOffset;
 
