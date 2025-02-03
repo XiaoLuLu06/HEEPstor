@@ -143,7 +143,7 @@ def get_test_predictions(model, test_loader, device, n_samples: int):
     plt.show()
 
     return {
-        # 'input_matrix': images.numpy(),
+        'input_matrix': images.numpy(),
         'expected_output_prob_matrix': probs.cpu().numpy(),
         'expected_predictions': predictions.cpu().numpy().tolist(),
         'true_label_values': labels.numpy().tolist()
@@ -206,16 +206,17 @@ def main(retrain=False, use_gpu_if_available=True):
     test(quantized_torch_model, test_loader, criterion, device, "quantized")
     test(model, test_loader, criterion, device, "non-quantized")
 
-    pred_res = get_test_predictions(quantized_torch_model, test_loader, device, 5)
+    pred_res = get_test_predictions(quantized_torch_model, test_loader, device, 1)
     pprint.pprint(pred_res)
 
-    print_test_predictions_forward_pass(test_loader, hp_nn, 5)
+    print_test_predictions_forward_pass(test_loader, hp_nn, 1)
 
     cg = hp.code_generator.CodeGenerator('fmnist-conv2d', hp_nn)
     cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
-    # cg.generate_example_main('main.cpp', pred_res['input_matrix'], pred_res['expected_output_prob_matrix'],
-    #                          pred_res['expected_predictions'], pred_res['true_label_values'],
-    #                          overwrite_existing_generated_files=True)
+    cg.generate_example_main('main.cpp', hp.code_generator.flatten_input_to_matrix(pred_res['input_matrix']),
+                             pred_res['expected_output_prob_matrix'],
+                             pred_res['expected_predictions'], pred_res['true_label_values'],
+                             overwrite_existing_generated_files=True)
 
 
 if __name__ == "__main__":

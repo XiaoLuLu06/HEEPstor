@@ -176,23 +176,64 @@ const size_t batch_size = 1;"""
             true_label_values: list[int],
             overwrite_existing_generated_files: bool
     ):
-        """
-        Generates example main.cpp with test matrices and predictions
-        """
+        """Generates example main.cpp with test matrices and predictions
 
+        Args:
+            filename: Name of the file to generate
+            input_matrix: For CONV networks: [height*width, channels] matrix for single image
+                         For LINEAR networks: [batch_size, num_features] matrix
+            expected_output_matrix: Expected output probabilities, shape matches network mode
+            expected_predictions: List of expected class predictions
+            true_label_values: List of true class labels
+            overwrite_existing_generated_files: Whether to overwrite existing files
+        """
+        # Validate project exists
         project_dir = HEEPSTOR_C_APPS_DIR / self.project_name
-
         if not project_dir.exists():
             raise ValueError(
                 f"Project {project_dir} does not exist, please generate code before generating the example main.")
 
         dest_file = project_dir / filename
-
         if dest_file.exists():
             if overwrite_existing_generated_files:
                 print(f'Overwriting existing example main in {dest_file}')
             else:
                 raise ValueError(f"File {dest_file} exists and overwrite_existing_generated_files=False")
+
+        # Determine network mode
+        supports_batching = all(
+            m.network_mode() == hp.module.NetworkMode.LINEAR
+            for m in self.sequential_network.modules.values()
+        )
+
+        # Validate input/output shapes based on mode
+        if supports_batching:
+            # Linear mode: batch-input with possibly batch_size > 1
+            batch_size = input_matrix.shape[0]
+            assert expected_output_matrix.shape[0] == batch_size, \
+                "Inconsistent batch_size of input and output in LINEAR mode"
+            assert len(expected_predictions) == batch_size, \
+                f"Expected {batch_size} predictions but got {len(expected_predictions)}"
+            assert len(true_label_values) == batch_size, \
+                f"Expected {batch_size} labels but got {len(true_label_values)}"
+            template_file = 'example_main_linear.cpp.tpl'
+        else:
+            # Conv mode: single image
+            h_w = input_matrix.shape[0]  # height * width
+            channels = input_matrix.shape[1]
+            expected_h_w = (self.sequential_network.input_dimensions.height *
+                            self.sequential_network.input_dimensions.width)
+            assert h_w == expected_h_w, \
+                f"Input matrix has {h_w} pixels but network expects {expected_h_w}"
+            assert channels == self.sequential_network.input_channels, \
+                f"Input matrix has {channels} channels but network expects {self.sequential_network.input_channels}"
+            assert len(expected_predictions) == 1, \
+                "Conv mode expects single prediction"
+            assert len(true_label_values) == 1, \
+                "Conv mode expects single label"
+            assert expected_output_matrix.shape[0] == 1, \
+                "Conv mode expects single output row"
+            template_file = 'example_main_conv.cpp.tpl'
 
         def matrix_to_c_initializer(matrix: npt.NDArray[np.float32]) -> str:
             rows, cols = matrix.shape
@@ -203,8 +244,9 @@ const size_t batch_size = 1;"""
                 row_strs.append(indent + "{" + ", ".join(elements) + "}")
             return "{\n" + ",\n".join(row_strs) + "\n    }"
 
-        template = Template((CODEGEN_TEMPLATE_DIR / 'example_main.cpp.tpl').read_text())
-
+        # Read and fill template
+        template_content = (CODEGEN_TEMPLATE_DIR / template_file).read_text()
+        template = Template(template_content)
         content = template.substitute(
             INPUT_MATRIX=matrix_to_c_initializer(input_matrix),
             EXPECTED_OUTPUT_MATRIX=matrix_to_c_initializer(expected_output_matrix),
@@ -213,6 +255,7 @@ const size_t batch_size = 1;"""
             PROJECT_NAME=self.project_name,
         )
 
+        # Write file
         dest_file.write_text(content)
 
     def generate_buffers(self) -> List[Buffer]:

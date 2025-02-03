@@ -17,10 +17,10 @@ public:
     static constexpr size_t NUM_OUTPUT_FEATURES = 10;
 
     static void infer(SystolicArray& systolic_array, const Matrix<float>& inputs, Matrix<float>& outputs,
-                      CheckpointPerformanceTimerDisplayConfig display_config) {
+                     CheckpointPerformanceTimerDisplayConfig display_config) {
 
         //////////////////////////////////////////////
-        // Validate input and output matrix
+        // Validate input and output sizes
         //////////////////////////////////////////////
 
         HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_FEATURES);
