@@ -327,6 +327,10 @@ class Conv2d(Module):
 
         self.quantized_torch_module = self.quantize_torch_module(torch_module)
 
+        # This will be filled out in a later pass
+        self.input_height = None
+        self.input_width = None
+
     def quantize_torch_module(self, non_quantized_torch_module: torch.nn.Module) -> torch.nn.Module:
         quantized_module = copy.deepcopy(non_quantized_torch_module)
 
@@ -404,6 +408,9 @@ class Conv2d(Module):
         if input_dims is None:
             raise ValueError("Conv2d requires input dimensions")
 
+        self.input_height = input_dims.height
+        self.input_width = input_dims.width
+
         out_height = input_dims.height - self.N + 1
         out_width = input_dims.width - self.N + 1
         return ImageDimensions(out_height, out_width)
@@ -424,7 +431,10 @@ class Conv2d(Module):
         return self.name
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
-        return f'Conv2d::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name});'
+        assert self.input_width is not None
+        assert self.input_height is not None
+
+        return f'Conv2d::forward(systolic_array, {input_buffer_name}, {self.weight_matrix_varname()}, ModelParameters::{self.weight_scale_varname()}, {self.bias_matrix_varname()}, {output_buffer_name}, {self.N}, {self.num_input_channels()}, {self.input_height}, {self.input_width});'
 
 
 class Flatten(Module):
@@ -499,7 +509,7 @@ class Flatten(Module):
         return self.name
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
-        return f'Flatten::forward(systolic_array, {input_buffer_name}, {output_buffer_name});'
+        return f'Flatten::forward({input_buffer_name}, {output_buffer_name});'
 
 
 class SequentialNetwork:

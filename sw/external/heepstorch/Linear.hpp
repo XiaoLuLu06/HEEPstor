@@ -1,7 +1,14 @@
 #pragma once
 
+#if USE_SOFTWARE_DNN_LAYER_OPERATORS
+// No need to include systolic array files
+#else
+
 #include <drivers/systolic_array/systolic_array.h>
 #include <heepstor_defs.h>
+
+#endif
+
 #include <math/matrix.h>
 #include <math/packed_int8_matrix.h>
 

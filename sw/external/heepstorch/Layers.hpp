@@ -4,6 +4,8 @@
 //  from the Heepstorch Python library
 
 #include "Argmax.hpp"
+#include "Conv2d.hpp"
+#include "Flatten.hpp"
 #include "Linear.hpp"
 #include "ReLu.hpp"
 #include "Softmax.hpp"

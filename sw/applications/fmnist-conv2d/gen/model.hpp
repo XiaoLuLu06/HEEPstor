@@ -64,7 +64,7 @@ public:
         //////////////////////////////////////////////
 
         // 1. conv1: Conv2d
-        Conv2d::forward(systolic_array, inputs, conv1_kernel_weights, ModelParameters::conv1_kernel_weight_scale, conv1_bias, intermediate_buf_1);
+        Conv2d::forward(systolic_array, inputs, conv1_kernel_weights, ModelParameters::conv1_kernel_weight_scale, conv1_bias, intermediate_buf_1, 4, 1, 14, 14);
         performance_timer.checkpoint();
 
         // 2. relu1: ReLU
@@ -72,7 +72,7 @@ public:
         performance_timer.checkpoint();
 
         // 3. conv2: Conv2d
-        Conv2d::forward(systolic_array, intermediate_buf_1, conv2_kernel_weights, ModelParameters::conv2_kernel_weight_scale, conv2_bias, intermediate_buf_2);
+        Conv2d::forward(systolic_array, intermediate_buf_1, conv2_kernel_weights, ModelParameters::conv2_kernel_weight_scale, conv2_bias, intermediate_buf_2, 4, 16, 11, 11);
         performance_timer.checkpoint();
 
         // 4. relu2: ReLU
@@ -80,7 +80,7 @@ public:
         performance_timer.checkpoint();
 
         // 5. flatten: Flatten
-        Flatten::forward(systolic_array, intermediate_buf_2, intermediate_buf_3);
+        Flatten::forward(intermediate_buf_2, intermediate_buf_3);
         performance_timer.checkpoint();
 
         // 6. fc1: Linear
