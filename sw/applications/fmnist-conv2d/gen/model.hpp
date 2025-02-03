@@ -30,8 +30,6 @@ public:
         HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
         HEEPSTOR_ASSERT(outputs.num_rows() == 1);
 
-        const size_t batch_size = 1;
-
         //////////////////////////////////////////////
         //  Wrap the model parameters into matrices.
         //////////////////////////////////////////////
@@ -55,9 +53,12 @@ public:
         //  Declare intermediate buffers
         //////////////////////////////////////////////
 
-        Matrix<float> intermediate_buf_1(11*11, 16);
-        Matrix<float> intermediate_buf_2(8*8, 8);
-        Matrix<float> intermediate_buf_3(batch_size, 512);
+        float* ping_buffer = StaticArenaAllocator::allocate_array<float>(1936);
+        float* pong_buffer = StaticArenaAllocator::allocate_array<float>(512);
+
+        Matrix<float> intermediate_buf_1(ping_buffer, 11*11, 16);
+        Matrix<float> intermediate_buf_2(pong_buffer, 8*8, 8);
+        Matrix<float> intermediate_buf_3(ping_buffer, 1, 512);
 
         //////////////////////////////////////////////
         //  Perform inference steps

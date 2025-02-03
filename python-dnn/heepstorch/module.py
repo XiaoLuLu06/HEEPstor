@@ -590,6 +590,14 @@ class SequentialNetwork:
     def get_module_by_name(self, name: str):
         return self.modules[name]
 
+    def supports_batching(self) -> bool:
+        """Returns true when this network supports batch_sizes>1 for its inputs (i.e., when there are no CONV mode layers)
+        """
+        return all(
+            m.network_mode() == NetworkMode.LINEAR
+            for m in self.modules.values()
+        )
+
     def validate_network(self):
         """Validates network architecture for compatibility constraints:
         1. If network has Conv2d/Flatten, must have input dimensions and channels

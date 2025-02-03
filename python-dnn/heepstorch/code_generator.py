@@ -20,16 +20,39 @@ class Buffer:
     mode: 'hp.module.NetworkMode'
     image_dims: Optional['hp.module.ImageDimensions'] = None
 
-    def get_declaration_code(self) -> str:
+    def get_declaration_code(self, is_network_cnn: bool, ping_pong_buffer_name: str) -> str:
         """Returns C++ code to declare this buffer based on mode"""
         if self.mode == hp.module.NetworkMode.CONV:
             if self.image_dims is None:
                 raise ValueError(f"Buffer {self.name} in CONV mode but has no image dimensions")
-            # For conv mode: fixed dimensions based on image size
-            return f'Matrix<float> {self.name}({self.image_dims.height}*{self.image_dims.width}, {self.channels});'
+            return f'Matrix<float> {self.name}({ping_pong_buffer_name}, {self.image_dims.height}*{self.image_dims.width}, {self.channels});'
         else:
-            # For linear mode: dynamic batch size from input
-            return f'Matrix<float> {self.name}(batch_size, {self.channels});'
+            if is_network_cnn:
+                return f'Matrix<float> {self.name}({ping_pong_buffer_name}, 1, {self.channels});'
+            else:
+                return f'Matrix<float> {self.name}({ping_pong_buffer_name}, batch_size, {self.channels});'
+
+    def get_buffer_size(self, is_network_cnn: bool) -> int:
+        """
+        Returns the buffer size. If the network is a CNN, returns the exact size in number of floats of this buffer (if this
+        is a linear buffer inside the CNN, then batch_size can be assumed to be 1 (as only one image is multiplied at a time).
+
+        If this is a non-linear CNN, then the buffer size is the result of this function * batch_size (which is a dynamic number not known).
+        """
+        if is_network_cnn:
+            # For CNNs, CONV mode needs image dimensions * channels
+            if self.mode == hp.module.NetworkMode.CONV:
+                if self.image_dims is None:
+                    raise ValueError(f"Buffer {self.name} in CONV mode but has no image dimensions")
+                return self.image_dims.height * self.image_dims.width * self.channels
+            else:
+                # For LINEAR mode in CNN, batch_size is 1
+                return 1 * self.channels
+        else:
+            assert self.mode == hp.module.NetworkMode.LINEAR
+
+            # For non-CNN networks, return number of features (will be multiplied by batch_size later)
+            return self.channels
 
 
 class CodeGenerator:
@@ -105,10 +128,7 @@ class CodeGenerator:
         model_parameters_cpp_template = Template(model_parameters_cpp)
 
         # Check if network supports batching
-        supports_batching = all(
-            m.network_mode() == hp.module.NetworkMode.LINEAR
-            for m in self.sequential_network.modules.values()
-        )
+        supports_batching = self.sequential_network.supports_batching()
 
         validation_code = """HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_FEATURES);
 HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
@@ -117,9 +137,7 @@ HEEPSTOR_ASSERT(inputs.num_rows() == outputs.num_rows());
 const size_t batch_size = inputs.num_rows();""" if supports_batching else """HEEPSTOR_ASSERT(inputs.num_rows() == INPUT_HEIGHT * INPUT_WIDTH);
 HEEPSTOR_ASSERT(inputs.num_cols() == NUM_INPUT_CHANNELS);
 HEEPSTOR_ASSERT(outputs.num_cols() == NUM_OUTPUT_FEATURES);
-HEEPSTOR_ASSERT(outputs.num_rows() == 1);
-
-const size_t batch_size = 1;"""
+HEEPSTOR_ASSERT(outputs.num_rows() == 1);"""
 
         # Generate content
         model_hpp_content = model_hpp_template.substitute(
@@ -201,10 +219,7 @@ const size_t batch_size = 1;"""
                 raise ValueError(f"File {dest_file} exists and overwrite_existing_generated_files=False")
 
         # Determine network mode
-        supports_batching = all(
-            m.network_mode() == hp.module.NetworkMode.LINEAR
-            for m in self.sequential_network.modules.values()
-        )
+        supports_batching = self.sequential_network.supports_batching()
 
         # Validate input/output shapes based on mode
         if supports_batching:
@@ -312,8 +327,7 @@ const size_t batch_size = 1;"""
         """Generate C++ inference code and configuration"""
         buffers = self.generate_buffers()
 
-        # Network is batch-capable only if all layers after first are LINEAR mode
-        supports_batching = all(b.mode == hp.module.NetworkMode.LINEAR for b in buffers[1:])
+        supports_batching = self.sequential_network.supports_batching()
 
         # Generate input/output configuration
         if supports_batching:
@@ -326,9 +340,47 @@ static constexpr size_t INPUT_WIDTH = {buffers[0].image_dims.width};"""
         output_info = f"static constexpr size_t NUM_OUTPUT_FEATURES = {buffers[-1].channels};"
 
         # Generate buffer declarations, skipping input/output buffers
+        intermediate_buffers = buffers[1:-1]
+
+        #######################################
+        # Compute sizes for ping/pong buffers
+        #######################################
+
+        # Compute max size for odd and even numbered buffers
+        is_network_cnn = not supports_batching
+
+        odd_buffer_sizes = [buf.get_buffer_size(is_network_cnn)
+                            for i, buf in enumerate(intermediate_buffers)
+                            if i % 2 == 0]
+        even_buffer_sizes = [buf.get_buffer_size(is_network_cnn)
+                             for i, buf in enumerate(intermediate_buffers)
+                             if i % 2 == 1]
+
         buffer_declarations = []
-        for buffer in buffers[1:-1]:
-            buffer_declarations.append(buffer.get_declaration_code())
+
+        ping_buffer_size = max(odd_buffer_sizes) if odd_buffer_sizes else 0
+        pong_buffer_size = max(even_buffer_sizes) if even_buffer_sizes else 0
+
+        if is_network_cnn:
+            ping_buffer_size_str = str(ping_buffer_size)
+            pong_buffer_size_str = str(pong_buffer_size)
+        else:
+            ping_buffer_size_str = f'batch_size * {ping_buffer_size}'
+            pong_buffer_size_str = f'batch_size * {pong_buffer_size}'
+
+        # Append ping / pong buffer declaration
+        buffer_declarations.append(
+            f'float* ping_buffer = StaticArenaAllocator::allocate_array<float>({ping_buffer_size_str});')
+        buffer_declarations.append(
+            f'float* pong_buffer = StaticArenaAllocator::allocate_array<float>({pong_buffer_size_str});')
+
+        # New line to separate ping / pong buffers from intermediate matrices
+        buffer_declarations.append('')
+
+        # Append intermediate buffers (matrix) declarations that use the ping / pong buffers
+        for i, buffer in enumerate(intermediate_buffers):
+            ping_pong_buffer_name = 'ping_buffer' if i % 2 == 0 else 'pong_buffer'
+            buffer_declarations.append(buffer.get_declaration_code(is_network_cnn, ping_pong_buffer_name))
 
         # Generate inference steps
         inference_steps = []
