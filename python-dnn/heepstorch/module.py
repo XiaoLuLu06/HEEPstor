@@ -12,6 +12,7 @@ from enum import Enum
 from dataclasses import dataclass
 
 from sympy.codegen.cnodes import static
+from torch.nn import MaxPool2d
 
 from heepstorch import quantization
 from heepstorch.code_generator import CodeGenerator
@@ -104,7 +105,7 @@ class Module(ABC):
         pass
 
     @staticmethod
-    def from_torch_module(m: torch.nn.Module, name: str) -> 'Module':
+    def from_torch_module(m: torch.nn.Module, name: str) -> Optional['Module']:
         """Convert a PyTorch module to a Module.
 
         Args:
@@ -131,6 +132,13 @@ class Module(ABC):
             return Conv2d(m, name)
         elif isinstance(m, torch.nn.Flatten):
             return Flatten(m, name)
+        elif isinstance(m, torch.nn.BatchNorm2d):
+            return BatchNorm2d(m, name)
+        elif isinstance(m, torch.nn.MaxPool2d):
+            return MaxPool2d(m, name)
+        elif isinstance(m, torch.nn.Dropout):
+            # Dropout is nop in inference
+            return None
         else:
             raise ValueError(f"Unsupported module type in Heepstorch: {type(m)}")
 
@@ -252,8 +260,7 @@ class Linear(Module):
 
 class ReLU(Module):
     """
-    Linear layer of dimensions [DIM_IN, DIM_OUT]. DIM_IN is the dimensionality of the input and DIM_OUT
-    is the dimensionality of the output.
+    ReLU layer
     """
 
     def __init__(self, torch_module: torch.nn.Module, name: str):
@@ -532,6 +539,158 @@ class Flatten(Module):
         return f'Flatten::forward({input_buffer_name}, {output_buffer_name});'
 
 
+class BatchNorm2d(Module):
+
+    def __init__(self, torch_module: torch.nn.Module, name: str):
+        self.name = name
+        self.torch_module = torch_module
+        self.quantized_torch_module = copy.deepcopy(torch_module)
+
+        self.num_channels = torch_module.num_features
+
+        # Pre-compute scale and shift parameters
+
+        gamma = torch_module.weight.data.cpu().detach().numpy()
+        beta = torch_module.bias.data.cpu().detach().numpy()
+        running_mean = torch_module.running_mean.data.cpu().detach().numpy()
+        running_var = torch_module.running_var.data.cpu().detach().numpy()
+
+        eps = torch_module.eps
+
+        self.scale = gamma / np.sqrt(running_var + eps)
+        self.shift = beta - gamma * running_mean / np.sqrt(running_var + eps)
+
+    def num_input_channels(self) -> int | None:
+        return self.num_channels
+
+    def num_output_channels(self) -> int | None:
+        return self.num_channels
+
+    def network_mode(self) -> NetworkMode:
+        return NetworkMode.CONV
+
+    def output_image_dimensions(self, input_dims: Optional[ImageDimensions],
+                                input_channels) -> Optional[ImageDimensions]:
+        return input_dims  # Preserves dimensions
+
+    def performs_inference_in_place(self) -> bool:
+        return True
+
+    def get_name(self) -> str:
+        return self.name
+
+    def forward_quantized(self, x: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        # Broadcast along the number of channels
+        return x * self.scale + self.shift
+
+    def get_quantized_torch_module(self) -> torch.nn.Module:
+        return self.quantized_torch_module
+
+    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
+        raise NotImplemented
+
+    def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
+        assert input_buffer_name == output_buffer_name
+
+        raise NotImplemented
+        return f'ReLU::forward({input_buffer_name});'
+
+
+class MaxPool2d(Module):
+
+    def __init__(self, torch_module: torch.nn.Module, name: str):
+        self.name = name
+        self.torch_module = torch_module
+        self.quantized_torch_module = copy.deepcopy(torch_module)
+
+        self.kernel_size = torch_module.kernel_size
+
+        assert torch_module.dilation == 1
+        assert torch_module.padding == 0
+        assert torch_module.stride == self.kernel_size
+
+        # Will be set by a later pass
+        self.out_height = None
+        self.out_width = None
+        self.in_height = None
+        self.in_width = None
+        self.input_channels = 0
+
+    def num_input_channels(self) -> int | None:
+        return None  # Can handle any number of channels
+
+    def num_output_channels(self) -> int | None:
+        return None  # Can handle any number of channels
+
+    def network_mode(self) -> NetworkMode:
+        return NetworkMode.CONV
+
+    def output_image_dimensions(self, input_dims: Optional[ImageDimensions],
+                                input_channels) -> Optional[ImageDimensions]:
+        out_height = (input_dims.height - self.kernel_size) // self.kernel_size + 1
+        out_width = (input_dims.width - self.kernel_size) // self.kernel_size + 1
+
+        self.in_height = input_dims.height
+        self.in_width = input_dims.width
+
+        self.out_height = out_height
+        self.out_width = out_width
+
+        self.input_channels = input_channels
+
+        return ImageDimensions(height=out_height, width=out_width)
+
+    def performs_inference_in_place(self) -> bool:
+        return False
+
+    def get_name(self) -> str:
+        return self.name
+
+    def forward_quantized(self, x: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        assert self.out_width is not None
+        assert self.out_height is not None
+        assert self.in_height is not None
+        assert self.in_width is not None
+        assert self.input_channels is not None
+
+        output_cols = np.zeros((self.out_height * self.out_width, self.input_channels), np.float32)
+
+        # Perform max pooling
+        for c in range(self.input_channels):
+            for i in range(self.out_height):
+                for j in range(self.out_width):
+                    # Get starting positions for this window
+                    h_start = i * self.kernel_size
+                    w_start = j * self.kernel_size
+
+                    # Initialize max value for this window
+                    current_max = float('-inf')
+
+                    # Iterate over each element in the window
+                    for ki in range(self.kernel_size):
+                        for kj in range(self.kernel_size):
+                            h_idx = h_start + ki
+                            w_idx = w_start + kj
+                            val = x[h_idx * self.in_width + w_idx, c]
+                            current_max = max(current_max, val)
+
+                    output_cols[i * self.out_width + j, c] = current_max
+
+        return output_cols
+
+    def get_quantized_torch_module(self) -> torch.nn.Module:
+        return self.quantized_torch_module
+
+    def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
+        raise NotImplemented
+
+    def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
+        assert input_buffer_name == output_buffer_name
+
+        raise NotImplemented
+        return f'ReLU::forward({input_buffer_name});'
+
+
 class SequentialNetwork:
     def __init__(self, modules: OrderedDict[str, Module],
                  input_dimensions: Optional[ImageDimensions] = None,
@@ -587,8 +746,9 @@ class SequentialNetwork:
 
         return SequentialNetwork(
             OrderedDict([
-                (sanitize_name(name), Module.from_torch_module(m, name))
+                (sanitize_name(name), converted_module)
                 for (name, m) in seq._modules.items()
+                if (converted_module := Module.from_torch_module(m, name)) is not None
             ]),
             input_dimensions=input_dimensions,
             input_channels=input_channels
@@ -600,8 +760,10 @@ class SequentialNetwork:
         ]))
 
     def forward(self, x: npt.NDArray[np.float32]):
-        for module in self.modules.values():
+        for name, module in self.modules.items():
             x = module.forward_quantized(x)
+            # print(f'{name}: {x.shape}')
+
         return x
 
     def __call__(self, *args, **kwargs):
@@ -619,13 +781,10 @@ class SequentialNetwork:
         )
 
     def validate_network(self):
-        """Validates network architecture for compatibility constraints:
-        1. If network has Conv2d/Flatten, must have input dimensions and channels
-        2. No Conv2d layers after Flatten
-        3. Channel counts match between consecutive layers
-        4. Image dimensions are valid throughout conv layers
-        5. Flatten gets proper channel count for output features
         """
+        Validates the network to check that dimensions of different layers agree, and performs several sanity checks.
+        """
+
         # First check if we need CONV mode
         has_conv_or_flatten = any(isinstance(m, (Conv2d, Flatten)) for m in self.modules.values())
 
@@ -653,44 +812,53 @@ class SequentialNetwork:
                         f"Module {name} expects {module.num_input_channels()} "
                         f"channels/features but receives {current_channels}"
                     )
-            # 2. Mode-specific validation and updates
+
+            num_input_channels = current_channels
+            input_dims = current_dims
+
             if isinstance(module, ReLU):
                 module.mode = current_mode
 
             if current_mode == NetworkMode.CONV:
+                # Sanity checks
                 if isinstance(module, Conv2d):
                     if current_dims is None:
                         raise ValueError(f"Conv2d layer {name} has no input dimensions")
-                    current_dims = module.output_image_dimensions(current_dims, None)
+                elif isinstance(module, Linear):
+                    raise ValueError(f"Linear layer {name} cannot appear in CONV mode before Flatten")
+
+                # Update image dimensions if specified by the module (otherwise they stay the same)
+                if isinstance(module, Flatten):
+                    if current_dims is None or current_channels is None:
+                        raise ValueError(f"Flatten layer {name} missing input dimensions or channels")
+
+                    # Special case for Flatten layer
+                    module.output_image_dimensions(input_dims, num_input_channels)
+                    current_mode = NetworkMode.LINEAR
+                    current_dims = None  # No more spatial dimensions in LINEAR mode
+                else:
+                    new_dims = module.output_image_dimensions(input_dims, num_input_channels)
+
+                    if new_dims is not None:
+                        current_dims = new_dims
+                    assert current_dims is not None
+
                     if current_dims.height <= 0 or current_dims.width <= 0:
                         raise ValueError(
                             f"Invalid output dimensions {current_dims.height}x{current_dims.width} "
-                            f"after Conv2d layer {name}"
+                            f"after layer {name}"
                         )
-                    current_channels = module.num_output_channels()
-                elif isinstance(module, Flatten):
-                    if current_dims is None or current_channels is None:
-                        raise ValueError(f"Flatten layer {name} missing input dimensions or channels")
-                    # Pass both dimensions and channels to compute output features
-                    module.output_image_dimensions(current_dims, current_channels)
-                    current_mode = NetworkMode.LINEAR
-                    current_dims = None  # No more spatial dimensions in LINEAR mode
-                    current_channels = module.num_output_channels()  # Get flattened feature count
-                elif isinstance(module, Linear):
-                    raise ValueError(f"Linear layer {name} cannot appear in CONV mode before Flatten")
             else:  # LINEAR mode
+                # Sanity checks
                 if isinstance(module, Conv2d):
                     raise ValueError(f"Conv2d layer {name} cannot appear after Flatten")
-                elif isinstance(module, Linear):
-                    if current_channels is not None and module.num_input_channels() != current_channels:
-                        raise ValueError(
-                            f"Linear layer {name} expects {module.num_input_channels()} features "
-                            f"but receives {current_channels}"
-                        )
-                    current_channels = module.num_output_channels()
                 elif isinstance(module, Flatten):
                     raise ValueError(f"Flatten layer {name} cannot appear in LINEAR mode")
 
             # Update channels if module specifies output channels
             if module.num_output_channels() is not None:
                 current_channels = module.num_output_channels()
+            assert current_channels is not None
+
+            # print(
+            #     f'Module {name}. C_IN={num_input_channels}, C_OUT={current_channels}, IM_SIZE={current_dims}')

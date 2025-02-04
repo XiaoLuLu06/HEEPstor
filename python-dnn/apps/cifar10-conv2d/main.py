@@ -6,6 +6,8 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import os
+import heepstorch as hp
+import pprint
 
 IMAGE_SIZE = 32
 CHANNELS = 3  # CIFAR-10 has 3 color channels
@@ -182,28 +184,78 @@ def get_test_predictions(model, test_loader, device, n_samples: int):
     }
 
 
+def print_test_predictions_forward_pass(test_loader, hp_nn: hp.module.SequentialNetwork, n_samples: int):
+    """
+       Gets first n_samples from test set and computes predictions and matrices
+    """
+    data_iter = iter(test_loader)
+    images, labels = next(data_iter)
+    images = images[:n_samples]
+    labels = labels[:n_samples]
+
+    probs = []
+    predictions = []
+
+    for i in range(n_samples):
+        image = hp.code_generator.flatten_input_to_matrix(images[i].detach().numpy())
+        output = hp_nn(image)
+        all_probs = torch.softmax(torch.from_numpy(output), 1)
+        pred = int(torch.argmax(all_probs).item())
+
+        predictions.append(pred)
+        probs.append(all_probs[0, pred])
+
+    print(f'Heepstorch forward pass predictions: {predictions} (probs={probs})')
+
+    # Create visualization
+    fig, axes = plt.subplots(1, n_samples, figsize=(3 * n_samples, 3))
+    if n_samples == 1:
+        axes = [axes]
+
+    classes = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+               'dog', 'frog', 'horse', 'ship', 'truck']
+
+    for i, ax in enumerate(axes):
+        # Reshape for display (3 channels)
+        img_display = images[i].view(CHANNELS, IMAGE_SIZE, IMAGE_SIZE).permute(1, 2, 0)
+        # Denormalize for display
+        img_display = img_display * torch.tensor([0.2023, 0.1994, 0.2010]) + torch.tensor([0.4914, 0.4822, 0.4465])
+        img_display = torch.clamp(img_display, 0, 1)
+
+        ax.imshow(img_display)
+        ax.set_title(
+            f'True: {classes[labels[i]]}\nPred: {classes[predictions[i]]} \n(prob {probs[i] * 100:.2f}%)')
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
+
+
 def main(retrain=False, use_gpu_if_available=True):
     device = torch.device('cuda' if use_gpu_if_available and torch.cuda.is_available() else 'cpu')
     train_loader, test_loader = get_loaders()
     criterion = torch.nn.CrossEntropyLoss()
 
     model = load_or_train_model(train_loader, test_loader, criterion, device, retrain)
-    get_test_predictions(model, test_loader, device, 5)
+    # get_test_predictions(model, test_loader, device, 1)
 
-    # hp_nn = hp.module.SequentialNetwork.from_torch_sequential(model)
-    # quantized_torch_model = hp_nn.get_quantized_torch_module()
-    #
-    # test(quantized_torch_model, test_loader, criterion, device, "quantized")
-    # test(model, test_loader, criterion, device, "non-quantized")
-    #
-    # pred_res = get_test_predictions(quantized_torch_model, test_loader, device, 5)
-    # # pprint.pprint(pred_res)
-    #
-    # cg = hp.code_generator.CodeGenerator('mnist-multi_layer', hp_nn)
-    # cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
-    # cg.generate_example_main('main.cpp', pred_res['input_matrix'], pred_res['expected_output_prob_matrix'],
-    #                          pred_res['expected_predictions'], pred_res['true_label_values'],
-    #                          overwrite_existing_generated_files=True)
+    hp_nn = hp.module.SequentialNetwork.from_torch_sequential(model, IMAGE_SIZE, IMAGE_SIZE, CHANNELS)
+    quantized_torch_model = hp_nn.get_quantized_torch_module()
+
+    test(quantized_torch_model, test_loader, criterion, device, "quantized")
+    test(model, test_loader, criterion, device, "non-quantized")
+
+    pred_res = get_test_predictions(quantized_torch_model, test_loader, device, 1)
+    pprint.pprint(pred_res)
+
+    print_test_predictions_forward_pass(test_loader, hp_nn, 1)
+
+    cg = hp.code_generator.CodeGenerator('fmnist-conv2d', hp_nn)
+    cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
+    cg.generate_example_main('main.cpp', hp.code_generator.flatten_input_to_matrix(pred_res['input_matrix']),
+                             pred_res['expected_output_prob_matrix'],
+                             pred_res['expected_predictions'], pred_res['true_label_values'],
+                             overwrite_existing_generated_files=True)
 
 
 if __name__ == "__main__":

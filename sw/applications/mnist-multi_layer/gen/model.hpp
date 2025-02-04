@@ -48,7 +48,10 @@ public:
         //  Declare intermediate buffers
         //////////////////////////////////////////////
 
-        Matrix<float> intermediate_buf_1(batch_size, 20);
+        float* ping_buffer = StaticArenaAllocator::allocate_array<float>(batch_size * 20);
+        float* pong_buffer = StaticArenaAllocator::allocate_array<float>(batch_size * 0);
+
+        Matrix<float> intermediate_buf_1(ping_buffer, batch_size, 20);
 
         //////////////////////////////////////////////
         //  Perform inference steps
