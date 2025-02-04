@@ -586,14 +586,44 @@ class BatchNorm2d(Module):
     def get_quantized_torch_module(self) -> torch.nn.Module:
         return self.quantized_torch_module
 
+    def scale_data_varname(self) -> str:
+        return f'{self.name}_scale_data'
+
+    def shift_data_varname(self) -> str:
+        return f'{self.name}_shift_data'
+
+    def scale_matrix_varname(self) -> str:
+        return f'{self.name}_scale'
+
+    def shift_matrix_varname(self) -> str:
+        return f'{self.name}_shift'
+
     def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
-        raise NotImplemented
+        assert self.scale.shape == (self.num_channels,)
+        assert self.shift.shape == (self.num_channels,)
+
+        c_code_scale_data, scale_arr_size = CodeGenerator.bias_to_c_array(self.scale, self.scale_data_varname())
+        c_code_shift_data, shift_arr_size = CodeGenerator.bias_to_c_array(self.shift, self.shift_data_varname())
+
+        assert scale_arr_size == shift_arr_size
+
+        model_parameter_definitions = '\n\n'.join([c_code_scale_data, c_code_shift_data])
+
+        c_code_wrapper_scale = f'const Matrix<float> {self.scale_matrix_varname()} = Matrix<float>::from_const_pointer(ModelParameters::{self.scale_data_varname()}, 1, {scale_arr_size});'
+        c_code_wrapper_shift = f'const Matrix<float> {self.shift_matrix_varname()} = Matrix<float>::from_const_pointer(ModelParameters::{self.shift_data_varname()}, 1, {shift_arr_size});'
+
+        wrapper = '\n'.join([c_code_wrapper_scale, c_code_wrapper_shift])
+
+        scale_data_declaration = f'constexpr float ModelParameters::{self.scale_data_varname()}[{scale_arr_size}];'
+        shift_data_declaration = f'constexpr float ModelParameters::{self.shift_data_varname()}[{shift_arr_size}];'
+
+        declarations = '\n'.join([scale_data_declaration, shift_data_declaration])
+
+        return model_parameter_definitions, wrapper, declarations
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
         assert input_buffer_name == output_buffer_name
-
-        raise NotImplemented
-        return f'ReLU::forward({input_buffer_name});'
+        return f'BatchNorm2d::forward({input_buffer_name}, {self.scale_matrix_varname()}, {self.shift_matrix_varname()});'
 
 
 class MaxPool2d(Module):
@@ -682,13 +712,10 @@ class MaxPool2d(Module):
         return self.quantized_torch_module
 
     def generate_model_parameters_c_code_constexpr_definitions(self) -> (str, str, str):
-        raise NotImplemented
+        return None, None, None
 
     def generate_inference_c_code(self, input_buffer_name: str, output_buffer_name: str) -> str:
-        assert input_buffer_name == output_buffer_name
-
-        raise NotImplemented
-        return f'ReLU::forward({input_buffer_name});'
+        return f'MaxPool2d::forward({input_buffer_name}, {output_buffer_name}, {self.kernel_size}, {self.in_height}, {self.in_width});'
 
 
 class SequentialNetwork:

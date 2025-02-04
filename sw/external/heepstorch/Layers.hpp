@@ -4,8 +4,10 @@
 //  from the Heepstorch Python library
 
 #include "Argmax.hpp"
+#include "BatchNorm2d.hpp"
 #include "Conv2d.hpp"
 #include "Flatten.hpp"
 #include "Linear.hpp"
+#include "MaxPool2d.hpp"
 #include "ReLu.hpp"
 #include "Softmax.hpp"

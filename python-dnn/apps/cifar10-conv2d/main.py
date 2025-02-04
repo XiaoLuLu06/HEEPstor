@@ -250,7 +250,7 @@ def main(retrain=False, use_gpu_if_available=True):
 
     print_test_predictions_forward_pass(test_loader, hp_nn, 1)
 
-    cg = hp.code_generator.CodeGenerator('fmnist-conv2d', hp_nn)
+    cg = hp.code_generator.CodeGenerator('cifar10-conv2d', hp_nn)
     cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
     cg.generate_example_main('main.cpp', hp.code_generator.flatten_input_to_matrix(pred_res['input_matrix']),
                              pred_res['expected_output_prob_matrix'],
