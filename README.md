@@ -23,10 +23,13 @@ Currently, the following PyTorch layer modules are supported. The main module mu
 
 - `nn.Linear`: with weights (which are quantized) and bias
 - `nn.ReLU`
+- `nn.Conv2d`
+- `nn.Flatten`
+- `nn.BatchNorm2d`
+- `nn.MaxPool2d`
+- `nn.Dropout`
 
 Additionally, an optional `Softmax` is supported at the end of the model to generate a probability distribution. This is achieved by passing an additional `append_final_softmax=True` argument to `heepstorch.code_generator.CodeGenerator.generate_code`. This way, the original model is not modified and criterions such as `torch.nn.CrossEntropyLoss` can still be used, without having to add a useless softmax layer to model training.
-
-In the future, our plan is to add support for more layers, such as `nn.Conv2d`.
 
 # Getting started
 
