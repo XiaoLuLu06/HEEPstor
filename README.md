@@ -51,7 +51,7 @@ In order to build the HW and SW C++ applications, do:
 
 In order to generate a C++ application from a PyTorch model, do:
 
-1. Write your Python application in `python-dnn/apps`. Take a look at some examples such as `mnist-single_layer` or `mnist-multi_layer`. The HEEPstor implementation with PyTorch is in the `heepstorch` package, stored in `python-dnn/heepstorch`.
+1. Write your Python application in `python-dnn/apps`. Take a look at some examples such as `mnist-single_layer`, `mnist-multi_layer`, `fmnist-conv2d` or `cifar10-conv2d`. The HEEPstor implementation with PyTorch is in the `heepstorch` package, stored in `python-dnn/heepstorch`.
 2. Install the prerequisites into your Python installation. The prerequisites can be found in `python-dnn/requirements.txt`.
 3. Run the Python application by adding `PYTHONPATH=/your/absolute/path/to/python-dnn/`: `PYTHONPATH=/your/absolute/path/to/python-dnn/ python3 python-dnn/apps/your-app/main.py`. Alternatively, you can open the folder `python-dnn` in an IDE such as PyCharm, which will then handle PYTHONPATH. Run each Python app inside their respective folders, as most of them will download some datasets (such as MNIST). We recommend using PyCharm, which automatically takes care of this.
 
