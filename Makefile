@@ -7,7 +7,7 @@
 
 .PHONY: clean help
 
-# Heepstor oftware parameters. Feel free to change them.
+# Heepstor software parameters. Feel free to change them.
 ENABLE_DEBUG_HEEPSTOR_ASSERTIONS ?= 1
 USE_SOFTWARE_DNN_LAYER_OPERATORS ?= 0
 
@@ -15,15 +15,10 @@ USE_SOFTWARE_DNN_LAYER_OPERATORS ?= 0
 FPGA_BOARD 	?= zcu104
 PORT		?= /dev/ttyUSB2
 
-# TODO: Check if we are setting the CPU correctly
 CPU ?= cv32e40p
 
-# TODO: See what EXTERNAL_DOMAINS is, and how to adapt it to our usecase.
-# 1 external domain for the CGRA
 EXTERNAL_DOMAINS = 1
 PROJECT ?= test_playground
-
-# TODO: Play with number of MEMORY_BANKS in the future
 
 MEMORY_BANKS ?= 16 # Multiple of 2
 #MEMORY_BANKS_IL ?= 4 # Power of 2

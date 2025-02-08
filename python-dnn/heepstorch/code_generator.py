@@ -7,6 +7,7 @@ import numpy.typing as npt
 import os
 from pathlib import Path
 from string import Template
+import pprint
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 CODEGEN_TEMPLATE_DIR = SCRIPT_DIR / 'templates' / 'codegen'
@@ -376,11 +377,15 @@ static constexpr size_t INPUT_WIDTH = {buffers[0].image_dims.width};"""
 
         # Add im2row buffer for convolutions
         if is_network_cnn:
-            im2row_buffer_size = max(
-                module.get_im2row_buffer_size()
+            im2row_buffer_sizes = {
+                module.get_name(): module.get_im2row_buffer_size()
                 for module in self.sequential_network.modules.values()
                 if isinstance(module, hp.module.Conv2d)
-            )
+            }
+
+            pprint.pprint(im2row_buffer_sizes)
+
+            im2row_buffer_size = max(im2row_buffer_sizes.values())
 
             buffer_declarations.append(
                 f'\nfloat* {hp.module.Conv2d.get_im2row_buffer_name()} = StaticArenaAllocator::allocate_array<float>({im2row_buffer_size});'

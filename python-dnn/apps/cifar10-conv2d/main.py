@@ -9,43 +9,33 @@ import os
 import heepstorch as hp
 import pprint
 
-IMAGE_SIZE = 32
+IMAGE_SIZE = 26
 CHANNELS = 3  # CIFAR-10 has 3 color channels
 
 
 def get_model(device):
     model = nn.Sequential(OrderedDict([
         # First conv block
-        ('conv1', nn.Conv2d(3, 16, kernel_size=3, padding=0)),
+        ('conv1', nn.Conv2d(3, 16, kernel_size=5, padding=0)),
         ('batchnorm1', nn.BatchNorm2d(16)),
         ('relu1', nn.ReLU()),
 
         # Second conv block
-        ('conv2', nn.Conv2d(16, 32, kernel_size=3, padding=0)),
-        ('batchnorm2', nn.BatchNorm2d(32)),
+        ('conv2', nn.Conv2d(16, 24, kernel_size=3, padding=0)),
+        ('batchnorm2', nn.BatchNorm2d(24)),
         ('relu2', nn.ReLU()),
-        ('pool2', nn.MaxPool2d(2)),  # 6x6
+        ('pool2', nn.MaxPool2d(2)),
 
         # Third conv block
-        ('conv3', nn.Conv2d(32, 64, kernel_size=3, padding=0)),
-        ('batchnorm3', nn.BatchNorm2d(64)),
+        ('conv3', nn.Conv2d(24, 6, kernel_size=4, padding=0)),
+        ('batchnorm3', nn.BatchNorm2d(6)),
         ('relu3', nn.ReLU()),
-
-        # Fourth conv block
-        ('conv4', nn.Conv2d(64, 32, kernel_size=3, padding=0)),
-        ('batchnorm4', nn.BatchNorm2d(32)),
-        ('relu4', nn.ReLU()),
-        # ('pool4', nn.MaxPool2d(2)),  # 3x3
-
-        # Fifth conv block (reduce channels for FC layer)
-        ('conv5', nn.Conv2d(32, 16, kernel_size=3, padding=0)),
-        ('batchnorm5', nn.BatchNorm2d(16)),
-        ('relu5', nn.ReLU()),
+        ('pool2', nn.MaxPool2d(2)),
 
         # Flatten and output
         ('flatten', nn.Flatten()),
-        ('dropout', nn.Dropout(0.5)),
-        ('fc1', nn.Linear(16 * 8 * 8, 10))
+        ('dropout', nn.Dropout(0.2)),
+        ('fc1', nn.Linear(6 * 7 * 7, 10))
     ])).to(device)
     return model
 
@@ -111,7 +101,7 @@ def test(model, test_loader, criterion, device, description=""):
 
 
 def train_model(model, train_loader, test_loader, criterion, device,
-                num_epochs=25, lr=0.001, checkpoint_path='cifar10_model.pth'):
+                num_epochs=30, lr=0.001, checkpoint_path='cifar10_model.pth'):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=2)
 
@@ -252,11 +242,11 @@ def main(retrain=False, use_gpu_if_available=True):
 
     cg = hp.code_generator.CodeGenerator('cifar10-conv2d', hp_nn)
     cg.generate_code(append_final_softmax=True, overwrite_existing_generated_files=True)
-    cg.generate_example_main('main.cpp', hp.code_generator.flatten_input_to_matrix(pred_res['input_matrix']),
-                             pred_res['expected_output_prob_matrix'],
-                             pred_res['expected_predictions'], pred_res['true_label_values'],
-                             overwrite_existing_generated_files=True)
+    # cg.generate_example_main('main.cpp', hp.code_generator.flatten_input_to_matrix(pred_res['input_matrix']),
+    #                          pred_res['expected_output_prob_matrix'],
+    #                          pred_res['expected_predictions'], pred_res['true_label_values'],
+    #                          overwrite_existing_generated_files=True)
 
 
 if __name__ == "__main__":
-    main(retrain=False, use_gpu_if_available=True)
+    main(retrain=True, use_gpu_if_available=True)

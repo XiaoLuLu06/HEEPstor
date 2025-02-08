@@ -2,7 +2,7 @@
 
 #include <math/matrix.h>
 #include <math/packed_int8_matrix.h>
-#include <Linear.hpp>
+#include "Linear.hpp"
 
 class Conv2d {
 public:

@@ -7,11 +7,9 @@
 #include <new>
 #include <utility>
 
-// TODO: In the future, maybe statically arrange the buffers.
-// TODO: Study whether this is a better approach than just using malloc.
 class StaticArenaAllocator {
 private:
-    static constexpr size_t ARENA_SIZE = 640 * 1024;  // 640 KiB
+    static constexpr size_t ARENA_SIZE = 310 * 1024;  // 310 KiB
     alignas(std::max_align_t) static uint8_t buffer[ARENA_SIZE];
     static size_t currentOffset;
 
