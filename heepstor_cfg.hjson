@@ -9,6 +9,6 @@
         // For example, an array of size 8 will have 8*8=64 Processing Elements.
         // It must be a multiple of 4.
         // TODO: Guarantee that it's a multiple of 4 in the generation script. 
-        size: 16
+        size: 12
     },
 }

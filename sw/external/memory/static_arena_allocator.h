@@ -9,7 +9,7 @@
 
 class StaticArenaAllocator {
 private:
-    static constexpr size_t ARENA_SIZE = 310 * 1024;  // 310 KiB
+    static constexpr size_t ARENA_SIZE = 400 * 1024;  // 400 KiB
     alignas(std::max_align_t) static uint8_t buffer[ARENA_SIZE];
     static size_t currentOffset;
 
