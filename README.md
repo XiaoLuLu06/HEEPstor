@@ -2,7 +2,7 @@
 
 HEEPstor is an open-hardware co-design framework for Post-Training Quantized Machine Learning at the edge, built on top of the X-HEEP platform.
 
-HEEPstor enables seamless deployment of unmodified PyTorch models on X-HEEP-based RISC-V heterogeneous SoCs with custom ML accelerators, enabling rapid design space exploration, optimization and evaluation of novel ML hardware accelerators with real machine learning workloads defined using PyTorch.
+HEEPstor enables seamless deployment of unmodified PyTorch models on X-HEEP-based RISC-V heterogeneous SoCs with custom ML accelerators, allowing for rapid design space exploration, optimization and evaluation of novel ML hardware accelerators with real machine learning workloads defined in PyTorch.
 
 This repository also contains a hybridly-quantized systolic array accelerator that serves as a hardware accelerator back-end for HEEPstor, providing end-to-end deployment from PyTorch models to a fully functional X-HEEP RISC-V SoC targeting FPGAs.
 
@@ -32,7 +32,7 @@ Additionally, an optional `Softmax` is supported at the end of the model to gene
 
 Due to its modular design, HEEPstor respects the X-HEEP workflow. As such, you can follow [X-HEEP's getting started](https://x-heep.readthedocs.io/en/latest/GettingStarted/index.html) to set up the environment. 
 
-In the rest of this section, we will go over the basic set-up and how to build and run HEEPstor applications, assuming you have at least set-up X-HEEP's `apt` packages, Conda environment, RISC-V compiler, Verilator and Verible. 
+In the rest of this section, we will go over the basic set-up and how to build and run HEEPstor applications, assuming you have at least set up X-HEEP's `apt` packages, Conda environment, RISC-V compiler, Verilator and Verible. 
 
 > [!WARNING]  
 > All the `make` commands must be run inside X-HEEP's Conda environment. After installing the environment, you can activate it using `conda activate core-v-mini-mcu`.
