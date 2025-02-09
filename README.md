@@ -1,27 +1,24 @@
 <p align="left"><img src="docs/HEEPstor_logo.png" width="500"></p>
 
-HEEPstor is an acceleration platform targeting ultra-low-power tensor computation built over the [X-HEEP](https://github.com/esl-epfl/x-heep) platform, extending it with a hybridly-quantized systolic array to optimize matrix-matrix multiply (GEMM) operations with FP32 activations and INT8 quantized-weights for neural networks. 
+HEEPstor is an open-hardware co-design framework for Post-Training Quantized Machine Learning at the edge, built on top of the X-HEEP platform.
 
-HEEPstor is integrated with the PyTorch Python Machine Learning to streamline the model to hardware-accelerated edge-AI workflow. HEEPstor can automatically convert a PyTorch module into a hardware-accelerated C++ X-Heep application using our hybridly-quantized systolic-array, automatically handling weight quantization, DNN layer operator execution and buffer management. HEEPstor also generates a quantized PyTorch model after weight-quantization, to easily evaluate the X-Heep model accuracy without needing to run the whole test on the embedded device.
+It enables seamless deployment of unmodified PyTorch models on X-HEEP-based RISC-V heterogeneous SoCs with custom ML accelerators, enabling rapid design space exploration, optimization and evaluation of novel ML hardware accelerators with real machine learning workloads defined using PyTorch.
 
-# Capabilities
+This repository also contains a hybridly-quantized systolic array accelerator that serves as a hardware accelerator back-end for HEEPstor, providing end-to-end deployment from PyTorch models to a fully functional X-HEEP RISC-V SoC targeting FPGAs.
 
-HEEPstor can currently:
+# Key features
 
-- Automatically generate X-Heep C++ applications implementing a given PyTorch model (see below section for supported layer modules)
-- Quantize the weights of a PyTorch model to INT8, and re-scale the results seamlessly to achieve both the accuracy of FP32 activations and the area, energy and memory savings of INT8 weights
-- Generate an INT8 weight-quantized PyTorch model from a given PyTorch model to easily evaluate the accuracy of the embedded quantized model on a desktop Python C++  
-- Generate an example `main.cpp` file performing an inference with given example data, and compare the output
-against the PyTorch model golden output  
-- Generate detailed per-layer inference performance reports on the embedded device
-- Target either an accelerated hybridly-quantized systolic array or software
-- Seamlessly support GPU-trained models
 
-## Currently supported PyTorch layer modules
+- **Automated Model Deployment:** Convert PyTorch models directly into hardware-accelerated C++ X-HEEP applications.
+- **Hybrid Quantization:** Quantize the weights of any PyTorch model to INT8, and re-scale the results seamlessly to achieve both the accuracy of FP32 activations and part of the area, energy and memory savings of INT8 weights.
+- **Performance Analysis:** Create memory usage and detailed per-layer inference performance reports.
+- **Hardware Flexibility**: Clean hardware abstraction layers and modular design that enable optimization and exploration of different GEMM accelerator architectures while maintaining the same software interface.
+- **Quantized Accuracy Evaluation**: Generate a fakely-quantized PyTorch model to efficiently evaluate post-quantization accuracy on the whole test dataset using GPU acceleration.
 
-Currently, the following PyTorch layer modules are supported. The main module must be a `torch.nn.Sequential`, which contains one of the following layers:
+## Supported PyTorch layer modules
 
-- `nn.Linear`: with weights (which are quantized) and bias
+The framework requires the main PyTorch module to be a `nn.Sequential` containing any of these layers:
+- `nn.Linear`
 - `nn.ReLU`
 - `nn.Conv2d`
 - `nn.Flatten`
@@ -33,33 +30,46 @@ Additionally, an optional `Softmax` is supported at the end of the model to gene
 
 # Getting started
 
-Due to its modular design, HEEPstor respects the X-HEEP workflow. As such, you can follow [X-HEEP's getting started](https://x-heep.readthedocs.io/en/latest/How_to/GettingStarted.html) to set up the environment. 
+Due to its modular design, HEEPstor respects the X-HEEP workflow. As such, you can follow [X-HEEP's getting started](https://x-heep.readthedocs.io/en/latest/GettingStarted/index.html) to set up the environment. 
 
-In this section, we will briefly go over the basic set-up. All of the make commands must be run inside the `X-Heep` conda environment. After installing the environment, you can activate it using `conda activate core-v-mini-mcu`.
+In the rest of this section, we will briefly go over the basic set-up and how to build and run HEEPstor applications, assuming you have at least set-up X-HEEP's `apt` packages, Conda environment, RISC-V compiler, Verilator and Verible. 
 
-Right now, the only supported FPGA is the Zynq UltraScale+ MPSoC ZCU104 Evaluation Kit (`zcu104`).
+> [!WARNING]  
+> All the `make` commands must be run inside X-HEEP's Conda environment. After installing the environment, you can activate it using `conda activate core-v-mini-mcu`.
 
-In order to build the HW and SW C++ applications, do:
+> [!NOTE]
+> Right now, the only supported FPGA is the Zynq UltraScale+ MPSoC ZCU104 Evaluation Kit (`zcu104`).
+
+There are two stages needed to deploy a PyTorch model to X-HEEP:
+
+1. Generate a C++ X-HEEP application from a PyTorch model  
+2. Synthesize X-HEEP hardware, build and run the generated C++ inference application
+
+### Synthesizing X-HEEP hardware, building and running C++ applications
+
+In order to build the HW and SW C++ applications, you must:
 
 1. Set the desired systolic array size in the config file `heepstor_cfg.hjson`
 2. Run `make heepstor-gen` to regenerate the files which depend on `heepstor_cfg.hjson`
 3. Run `make mcu-gen` to generate the MCU files, including the vendorized X-Heep. 
 4. Run `make vivado-fpga` to perform synthesis and implementation to generate the bitstream for the FPGA.
 5. Load the bitstream into the FPGA using Vivado Hardware Manager.
-6. Run `make app PROJECT=your_project_name` to build the application in folder `sw/applications/your_project_name`.
-7. Run `make run-fpga-com PROJECT=your_project_name` to load the application into the Flash if you have an ESL-EPFL programmer for X-Heep attached. Otherwise, if you want to load using OpenOCD, see the corrersponding section below.
+6. Run `make app PROJECT=your_project_name` to build the C++ application stored in the folder `sw/applications/your_project_name`. You can build a pre-existing C++ application or follow the instructions in the next paragraph to automatically generate C++ inference code from a PyTorch model.
+7. Run `make run-fpga-com PROJECT=your_project_name` to load the application into the Flash if you have an ESL-EPFL programmer for X-Heep attached. Alternatively, if you want to load using OpenOCD, see the corresponding section below.
 
-In order to generate a C++ application from a PyTorch model, do:
+### Automatically generating C++ inference code from a PyTorch model
 
-1. Write your Python application in `python-dnn/apps`. Take a look at some examples such as `mnist-single_layer`, `mnist-multi_layer`, `fmnist-conv2d` or `cifar10-conv2d`. The HEEPstor implementation with PyTorch is in the `heepstorch` package, stored in `python-dnn/heepstorch`.
+In order to automatically generate a C++ application from a PyTorch model, you must:
+
+1. Write your Python application in `python-dnn/apps`. Take a look at some examples such as `mnist-single_layer`, `mnist-multi_layer`, `fmnist-conv2d` or `cifar10-conv2d`. The HEEPstor integration with PyTorch is available in the `heepstorch` package, stored in `python-dnn/heepstorch`.
 2. Install the prerequisites into your Python installation. The prerequisites can be found in `python-dnn/requirements.txt`.
 3. Run the Python application by adding `PYTHONPATH=/your/absolute/path/to/python-dnn/`: `PYTHONPATH=/your/absolute/path/to/python-dnn/ python3 python-dnn/apps/your-app/main.py`. Alternatively, you can open the folder `python-dnn` in an IDE such as PyCharm, which will then handle PYTHONPATH. Run each Python app inside their respective folders, as most of them will download some datasets (such as MNIST). We recommend using PyCharm, which automatically takes care of this.
 
 ## Running and debugging using OpenOCD
 
-You will need to open 3 terminal windows, one with the UART screen, another for OpenOCD and a third one for gdb. Follow the official X-Heep instructions for installing OpenOCD (https://x-heep.readthedocs.io/en/latest/How_to/Debug.html).
+You will need to open 3 terminal windows, one with an UART screen, another for OpenOCD and a third one for GDB. Follow the official X-Heep instructions for installing OpenOCD (https://x-heep.readthedocs.io/en/latest/How_to/Debug.html).
 
-To open those windows, run the following commands:
+To open those windows, run the following commands in order:
 1. `make picocom`
 2. `make openocd`
 3. `make gdb PROJECT=PROJECT_NAME`. This application calls `make app` before running GDB, with the provided arguments (such as `PROJECT` or other options). 
@@ -74,21 +84,5 @@ In the GDB window, you can use the following commands:
 There are several options that can be tweaked if needed:
 
 - **Memory size**: You can change the number of X-Heep HW memory banks by tweaking `MEMORY_BANKS` in the `Makefile`. If you run out of space for intermediate buffers or the input / output matrices, which are stored in the `StaticArenaAllocator`, you can increase its size by changing `StaticArenaAllocator::ARENA_SIZE` in `sw/external/memory/static_arena_allocator.h`.
-- **Disable debug assertions**: To speed-up operation, you can disable HEEPstor assertions (which disables every `HEEPSTOR_ASSERT`) by using `ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`: `make run-fpga-com PROJECT=your_project_name ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`.
+- **Disable debug assertions**: To speed up operation, you can disable HEEPstor assertions (which disables every `HEEPSTOR_ASSERT`) by using `ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`: `make run-fpga-com PROJECT=your_project_name ENABLE_DEBUG_HEEPSTOR_ASSERTIONS=0`.
 - **Use software DNN layer operators instead of the systolic array**: `make run-fpga-com PROJECT=your_project_name USE_SOFTWARE_DNN_LAYER_OPERATORS=1`.
-
-# Reference
-
-You can learn more about the HEEPstor systolic array platform in: [Systolic Arrays and Structured Pruning Co-design for Efficient Transformers in Edge Systems](https://arxiv.org/abs/2411.10285).
-
-```
-@misc{palacios2024systolicarraysstructuredpruning,
-      title={Systolic Arrays and Structured Pruning Co-design for Efficient Transformers in Edge Systems}, 
-      author={Pedro Palacios and Rafael Medina and Jean-Luc Rouas and Giovanni Ansaloni and David Atienza},
-      year={2024},
-      eprint={2411.10285},
-      archivePrefix={arXiv},
-      primaryClass={cs.AR},
-      url={https://arxiv.org/abs/2411.10285}, 
-}
-```
