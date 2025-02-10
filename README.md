@@ -32,10 +32,13 @@ Additionally, an optional `Softmax` is supported at the end of the model to gene
 
 Due to its modular design, HEEPstor respects the X-HEEP workflow. As such, you can follow [X-HEEP's getting started](https://x-heep.readthedocs.io/en/latest/GettingStarted/index.html) to set up the environment. 
 
+> [!WARNING]
+> You must compile the RISC-V `gcc` with support for the `rv32imfc` architecture, with a hardware Floating Point Unit. At the moment of writing this documentation, X-HEEP's instructions for installing the RISC-V toolchain do not support it by default. Therefore, when configuring the `RISC-V` compiler you should instead use `./configure --prefix=/home/$USER/tools/riscv --with-abi=ilp32 --with-arch=rv32imfc --with-cmodel=medlow`. 
+
 In the rest of this section, we will go over the basic set-up and how to build and run HEEPstor applications, assuming you have at least set up X-HEEP's `apt` packages, Conda environment, RISC-V compiler, Verilator and Verible. 
 
 > [!WARNING]  
-> All the `make` commands must be run inside X-HEEP's Conda environment. After installing the environment, you can activate it using `conda activate core-v-mini-mcu`.
+> All the `make` commands must be run inside X-HEEP's Conda environment. To install it, you can run `make conda` inside the `hw/vendor/esl_epfl_x_heep` directory. After installing the environment, you can activate it using `conda activate core-v-mini-mcu`.
 
 > [!NOTE]
 > Right now, the only supported FPGA is the Zynq UltraScale+ MPSoC ZCU104 Evaluation Kit (`zcu104`).
