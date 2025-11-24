@@ -1,3 +1,16 @@
+import sys
+import os
+
+# 获取当前文件所在目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 计算项目根目录 (HEEPstor/python-dnn/)
+project_root = os.path.abspath(os.path.join(current_dir, '../../..'))
+# 将项目根目录添加到 Python 搜索路径
+sys.path.append(project_root)
+
+
+
+
 # micro_speech_pytorch.py
 from collections import OrderedDict
 import torch
